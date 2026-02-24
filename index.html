@@ -105,6 +105,7 @@
         </button>
         <p class="text-center text-xs text-slate-400">Your email is only used to notify you of interview scheduling or application status.</p>
       </form>
+      <p id="apply-hireai-badge" class="text-center text-xs text-slate-300 mt-4">Powered by <a href="https://rblagahit.github.io/hireai/" target="_blank" class="font-bold hover:text-indigo-400 transition-colors">HireAI</a></p>
     </div>
 
     <!-- Success state -->
@@ -137,6 +138,54 @@
         ✓ Mark as Rejected
       </button>
     </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     UPGRADE MODAL
+════════════════════════════════════════ -->
+<div id="upgrade-modal" style="display:none" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
+  <div class="bg-white w-full max-w-2xl rounded-[2.5rem] p-10 shadow-2xl relative fade-in max-h-[90vh] overflow-y-auto">
+    <button onclick="closeUpgradeModal()" class="absolute top-6 right-6 text-slate-400 hover:text-slate-700 text-xl font-bold">✕</button>
+    <div class="text-center mb-8">
+      <p id="upgrade-reason-icon" class="text-5xl mb-3">🚀</p>
+      <h2 id="upgrade-reason-title" class="text-2xl font-black text-slate-900 mb-2">Upgrade your plan</h2>
+      <p id="upgrade-reason-msg" class="text-slate-500 text-sm max-w-md mx-auto"></p>
+    </div>
+    <!-- Plan cards -->
+    <div class="grid grid-cols-2 gap-4">
+      <!-- Pro -->
+      <div class="bg-indigo-50 border-2 border-indigo-200 rounded-[1.5rem] p-6 space-y-4">
+        <div>
+          <p class="text-xs font-black uppercase tracking-widest text-indigo-400 mb-1">Pro</p>
+          <p class="text-3xl font-black text-slate-900">$29<span class="text-sm font-semibold text-slate-400">/mo</span></p>
+        </div>
+        <ul class="space-y-1.5 text-sm">
+          <li class="flex items-center space-x-2"><span class="text-emerald-500 font-black">✓</span><span>Unlimited job posts</span></li>
+          <li class="flex items-center space-x-2"><span class="text-emerald-500 font-black">✓</span><span>Managed AI (no key needed)</span></li>
+          <li class="flex items-center space-x-2"><span class="text-emerald-500 font-black">✓</span><span>50 CVs per batch</span></li>
+          <li class="flex items-center space-x-2"><span class="text-emerald-500 font-black">✓</span><span>Email alerts + auto-email</span></li>
+          <li class="flex items-center space-x-2"><span class="text-emerald-500 font-black">✓</span><span>CSV export</span></li>
+        </ul>
+        <a href="mailto:hello@hireai.app?subject=Upgrade to Pro" target="_blank" class="block w-full text-center bg-indigo-600 text-white py-3 rounded-2xl font-bold text-sm hover:bg-indigo-500 transition-colors">Get Pro — $29/mo</a>
+      </div>
+      <!-- Power -->
+      <div class="bg-violet-50 border-2 border-violet-200 rounded-[1.5rem] p-6 space-y-4">
+        <div>
+          <p class="text-xs font-black uppercase tracking-widest text-violet-400 mb-1">Power ⚡</p>
+          <p class="text-3xl font-black text-slate-900">$79<span class="text-sm font-semibold text-slate-400">/mo</span></p>
+        </div>
+        <ul class="space-y-1.5 text-sm">
+          <li class="flex items-center space-x-2"><span class="text-emerald-500 font-black">✓</span><span>Everything in Pro</span></li>
+          <li class="flex items-center space-x-2"><span class="text-emerald-500 font-black">✓</span><span>200 CVs per batch</span></li>
+          <li class="flex items-center space-x-2"><span class="text-emerald-500 font-black">✓</span><span>Multi-seat (5 users)</span></li>
+          <li class="flex items-center space-x-2"><span class="text-emerald-500 font-black">✓</span><span>Pipeline + Analytics</span></li>
+          <li class="flex items-center space-x-2"><span class="text-emerald-500 font-black">✓</span><span>Drive / Calendar integrations</span></li>
+        </ul>
+        <a href="mailto:hello@hireai.app?subject=Upgrade to Power" target="_blank" class="block w-full text-center bg-violet-600 text-white py-3 rounded-2xl font-bold text-sm hover:bg-violet-500 transition-colors">Get Power — $79/mo</a>
+      </div>
+    </div>
+    <p class="text-center text-xs text-slate-400 mt-6">Questions? <a href="mailto:hello@hireai.app" class="underline font-bold">hello@hireai.app</a></p>
   </div>
 </div>
 
@@ -864,9 +913,15 @@
         <button onclick="showTab('templates')" id="nav-templates" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-bold text-sm transition-all text-slate-500 hover:bg-slate-50">
           <span>✉️</span><span>Email Templates</span>
         </button>
+        <button onclick="showTab('plans')" id="nav-plans" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-bold text-sm transition-all text-slate-500 hover:bg-slate-50">
+          <span>💳</span><span>Plans</span>
+        </button>
       </nav>
       <div class="border-t border-slate-100 pt-4 space-y-1">
-        <p id="sidebar-email" class="text-xs text-slate-400 font-bold px-4 mb-2 truncate"></p>
+        <div class="flex items-center justify-between px-4 mb-2">
+          <p id="sidebar-email" class="text-xs text-slate-400 font-bold truncate"></p>
+          <span id="sidebar-plan-badge" class="text-xs font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 flex-shrink-0 ml-2">Free</span>
+        </div>
         <button onclick="logout()" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-400 hover:text-red-500 font-bold text-sm transition-colors">
           <span>↩</span><span>Sign Out</span>
         </button>
@@ -881,7 +936,7 @@
         <div class="flex justify-between items-center">
           <div>
             <h1 class="text-3xl font-black">Job Posts</h1>
-            <p class="text-slate-500 text-sm mt-1">Free forever · Unlimited posts · Candidates apply with email + resume</p>
+            <p id="jobs-tab-subtitle" class="text-slate-500 text-sm mt-1">Free plan · 5 active job posts · upgrade for unlimited</p>
           </div>
           <button onclick="toggleJobForm()" class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center space-x-2 shadow-lg shadow-indigo-200 hover:bg-indigo-500 transition-colors">
             <span>+</span><span>New Job</span>
@@ -915,7 +970,7 @@
       <div id="tab-screening" style="display:none" class="max-w-4xl mx-auto space-y-8">
         <div>
           <h1 class="text-3xl font-black">AI Screening</h1>
-          <p class="text-slate-500 text-sm mt-1">Gemini API · free tier · bring your own key · max 200 CVs per batch</p>
+          <p id="screening-tab-subtitle" class="text-slate-500 text-sm mt-1">Gemini API · free tier · bring your own key · max 10 CVs per batch</p>
         </div>
         <div class="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
 
@@ -1001,9 +1056,14 @@
             <h1 class="text-3xl font-black">Talent Matrix</h1>
             <p class="text-slate-500 text-sm mt-1">AI-ranked candidates · Top 5 → Google Calendar · Rest → Rejection letter</p>
           </div>
-          <div id="matrix-legend" style="display:none" class="flex items-center space-x-4 text-xs font-bold">
-            <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span><span class="text-slate-500">Top 5</span></span>
-            <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-slate-300 inline-block"></span><span class="text-slate-500">Others</span></span>
+          <div class="flex items-center space-x-3">
+            <div id="matrix-legend" style="display:none" class="flex items-center space-x-4 text-xs font-bold">
+              <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span><span class="text-slate-500">Top 5</span></span>
+              <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-slate-300 inline-block"></span><span class="text-slate-500">Others</span></span>
+            </div>
+            <button onclick="exportCSV()" class="flex items-center space-x-1.5 border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50 transition-colors">
+              <span>⬇️</span><span>Export CSV</span>
+            </button>
           </div>
         </div>
         <div id="matrix-list"></div>
@@ -1050,6 +1110,16 @@
             <div id="invite-preview" class="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-sm text-slate-600 whitespace-pre-wrap font-mono leading-relaxed"></div>
           </div>
         </div>
+      </div>
+
+      <!-- ── PLANS TAB ── -->
+      <div id="tab-plans" style="display:none" class="max-w-4xl mx-auto space-y-8">
+        <div>
+          <h1 class="text-3xl font-black">Plans &amp; Billing</h1>
+          <p class="text-slate-500 text-sm mt-1">Choose the plan that fits your hiring volume.</p>
+        </div>
+        <div id="plans-grid" class="grid grid-cols-3 gap-6"></div>
+        <p class="text-center text-xs text-slate-400">To upgrade, email <a href="mailto:hello@hireai.app" class="underline font-bold text-indigo-600">hello@hireai.app</a> — Stripe billing coming soon.</p>
       </div>
 
     </main>
@@ -1105,9 +1175,35 @@ Best regards,
 {{senderName}}
 {{company}}`;
 
+// ─── PLANS ────────────────────────────────
+const PLANS = {
+  free: {
+    name: 'Free', price: 0, badge: 'Free', badgeColor: 'bg-slate-100 text-slate-500',
+    maxJobs: 5, batchLimit: 10,
+    managedAI: false, branding: true, csvExport: false,
+    multiSeat: false, pipeline: false, analytics: false,
+    perks: ['5 active job posts','Unlimited applications','BYOK AI screening (own Gemini key)','Max 10 CVs per batch','Basic Talent Matrix','Powered by HireAI badge on apply page']
+  },
+  pro: {
+    name: 'Pro', price: 29, badge: 'Pro', badgeColor: 'bg-indigo-100 text-indigo-600',
+    maxJobs: Infinity, batchLimit: 50,
+    managedAI: true, branding: false, csvExport: true,
+    multiSeat: false, pipeline: false, analytics: false,
+    perks: ['Unlimited job posts','HireAI managed AI (no key needed)','Max 50 CVs per batch','Email alerts when applications arrive','Auto-email candidates on status change','Remove HireAI branding + custom logo','CSV export of ranked candidates']
+  },
+  power: {
+    name: 'Power', price: 79, badge: 'Power ⚡', badgeColor: 'bg-violet-100 text-violet-600',
+    maxJobs: Infinity, batchLimit: 200,
+    managedAI: true, branding: false, csvExport: true,
+    multiSeat: true, pipeline: true, analytics: true,
+    perks: ['Everything in Pro','Max 200 CVs per batch','Multi-seat (up to 5 users)','Pipeline view (Applied → Interview → Offer → Hired)','Analytics (funnel, conversion, time-to-hire)','Google Calendar interview booking','Google Drive / OneDrive bulk CV upload']
+  }
+};
+
 // ─── STATE ───────────────────────────────
 let authMode          = 'login';
 let currentUser       = null;
+let currentPlan       = 'free';
 let selectedFiles     = [];
 let currentApplyJobId = null;
 let resumeFile        = null;
@@ -1129,6 +1225,98 @@ async function getConfig() {
 async function saveConfig(data) {
   await settingDoc('config').set(data, { merge: true });
 }
+
+// ─── PLAN HELPERS ─────────────────────────
+function plan() { return PLANS[currentPlan] || PLANS.free; }
+
+async function loadPlan() {
+  try {
+    const snap = await settingDoc('plan').get();
+    currentPlan = snap.exists ? (snap.data().tier || 'free') : 'free';
+  } catch { currentPlan = 'free'; }
+}
+
+function updatePlanUI() {
+  const p = plan();
+  // Sidebar badge
+  const badge = document.getElementById('sidebar-plan-badge');
+  if (badge) {
+    badge.textContent  = p.badge;
+    badge.className    = `text-xs font-black px-2 py-0.5 rounded-full ${p.badgeColor}`;
+  }
+  // Job posts subtitle
+  const jobSub = document.getElementById('jobs-tab-subtitle');
+  if (jobSub) jobSub.textContent = currentPlan === 'free'
+    ? `Free plan · ${p.maxJobs} active job posts · upgrade for unlimited`
+    : `${p.name} plan · Unlimited job posts`;
+  // Screening subtitle
+  const scrSub = document.getElementById('screening-tab-subtitle');
+  if (scrSub) scrSub.textContent =
+    `Gemini API · ${currentPlan === 'free' ? 'free tier · bring your own key · ' : ''}max ${p.batchLimit} CVs per batch`;
+}
+
+function showUpgradeModal(reason) {
+  const reasons = {
+    'job-limit':   { icon:'💼', title:'You\'ve reached your job post limit', msg:`Free plan allows ${PLANS.free.maxJobs} active jobs. Upgrade to post unlimited roles.` },
+    'batch-limit': { icon:'⚡', title:'Batch limit reached', msg:`Your ${plan().name} plan screens up to ${plan().batchLimit} CVs per batch. Upgrade for a higher limit.` },
+    'csv':         { icon:'📊', title:'CSV export is a Pro feature', msg:'Upgrade to Pro or Power to export your ranked candidates as a CSV file.' },
+    'managed-ai':  { icon:'🤖', title:'Managed AI is a Pro feature', msg:'Upgrade to Pro and HireAI provides the AI — no Gemini key needed.' },
+  };
+  const r = reasons[reason] || { icon:'🚀', title:'Upgrade your plan', msg:'Unlock more features with a paid plan.' };
+  document.getElementById('upgrade-reason-icon').textContent  = r.icon;
+  document.getElementById('upgrade-reason-title').textContent = r.title;
+  document.getElementById('upgrade-reason-msg').textContent   = r.msg;
+  document.getElementById('upgrade-modal').style.display = 'flex';
+}
+function closeUpgradeModal() {
+  document.getElementById('upgrade-modal').style.display = 'none';
+}
+
+function exportCSV() {
+  if (!plan().csvExport) { showUpgradeModal('csv'); return; }
+  getRankings().then(candidates => {
+    if (!candidates.length) { alert('No ranked candidates yet. Run AI Screening first.'); return; }
+    const header = ['Rank','Name','Email','Score','Reasoning','Job Title','Status'];
+    const rows   = candidates.map((c, i) => [
+      i + 1, c.name, c.email, c.score, `"${(c.reasoning||'').replace(/"/g,'""')}"`, c.jobTitle || '', c.status || ''
+    ]);
+    const csv  = [header, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'talent-matrix.csv'; a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+function renderPlans() {
+  const el = document.getElementById('tab-plans');
+  if (!el) return;
+  const tiers = ['free','pro','power'];
+  el.querySelector('#plans-grid').innerHTML = tiers.map(key => {
+    const p       = PLANS[key];
+    const isActive = key === currentPlan;
+    const ring    = isActive ? 'ring-2 ring-indigo-500' : 'border border-slate-200';
+    const btnCls  = key === 'free'
+      ? 'w-full py-3 rounded-2xl font-bold text-sm border border-slate-200 text-slate-400 cursor-default'
+      : key === 'pro'
+        ? 'w-full py-3 rounded-2xl font-bold text-sm bg-indigo-600 text-white hover:bg-indigo-500 transition-colors'
+        : 'w-full py-3 rounded-2xl font-bold text-sm bg-violet-600 text-white hover:bg-violet-500 transition-colors';
+    const btnTxt  = isActive ? '✓ Current plan' : key === 'free' ? 'Your base plan' : `Upgrade to ${p.name} — $${p.price}/mo`;
+    return `<div class="bg-white ${ring} rounded-[2rem] p-8 space-y-6 relative">
+      ${isActive ? '<span class="absolute top-5 right-5 text-xs font-black bg-indigo-600 text-white px-2.5 py-1 rounded-full">Current</span>' : ''}
+      <div>
+        <p class="text-xs font-black uppercase tracking-widest text-slate-400 mb-1">${p.name}</p>
+        <p class="text-4xl font-black text-slate-900">${p.price === 0 ? 'Free' : '$' + p.price}<span class="text-base font-semibold text-slate-400">${p.price > 0 ? '/mo' : ''}</span></p>
+      </div>
+      <ul class="space-y-2">
+        ${p.perks.map(perk => `<li class="flex items-start space-x-2 text-sm"><span class="text-emerald-500 font-black flex-shrink-0 mt-0.5">✓</span><span class="text-slate-600">${perk}</span></li>`).join('')}
+      </ul>
+      <button onclick="${key !== 'free' && !isActive ? 'window.open(\'mailto:hello@hireai.app?subject=Upgrade to ' + p.name + '\',\'_blank\')' : ''}" class="${btnCls}" ${isActive || key === 'free' ? 'disabled' : ''}>${btnTxt}</button>
+    </div>`;
+  }).join('');
+}
+
 async function getJobs() {
   try {
     const snap = await jobsCol().orderBy('createdAt', 'desc').get();
@@ -1250,26 +1438,31 @@ async function logout() {
 }
 
 // ─── APP SHELL ───────────────────────────
-function showApp() {
+async function showApp() {
   document.getElementById('page-landing').style.display = 'none';
   document.getElementById('page-app').style.display = 'block';
   document.getElementById('sidebar-email').textContent = currentUser.name || currentUser.email;
+  await loadPlan();
+  updatePlanUI();
   showTab('jobs');
 }
 function showTab(id) {
-  ['jobs','screening','matrix','templates'].forEach(t => {
+  ['jobs','screening','matrix','templates','plans'].forEach(t => {
     document.getElementById('tab-' + t).style.display = 'none';
-    document.getElementById('nav-' + t).className =
+    const nav = document.getElementById('nav-' + t);
+    if (nav) nav.className =
       'w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-bold text-sm transition-all text-slate-500 hover:bg-slate-50';
   });
   document.getElementById('tab-' + id).style.display = 'block';
   document.getElementById('tab-' + id).classList.add('fade-in');
-  document.getElementById('nav-' + id).className =
+  const activeNav = document.getElementById('nav-' + id);
+  if (activeNav) activeNav.className =
     'w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-bold text-sm transition-all bg-indigo-600 text-white shadow-lg';
   if (id === 'jobs')      renderJobs();
   if (id === 'screening') renderScreeningSelector();
   if (id === 'matrix')    renderMatrix();
   if (id === 'templates') renderTemplates();
+  if (id === 'plans')     renderPlans();
 }
 
 // ─── JOB POSTS ───────────────────────────
@@ -1282,6 +1475,20 @@ async function createJob(e) {
   const btn = e.target.querySelector('button[type="submit"]');
   btn.disabled    = true;
   btn.textContent = 'Saving…';
+
+  // ── Plan limit check ──
+  const maxJobs = plan().maxJobs;
+  if (maxJobs !== Infinity) {
+    const existing = await getJobs();
+    const active   = existing.filter(j => j.status === 'active').length;
+    if (active >= maxJobs) {
+      btn.disabled    = false;
+      btn.textContent = 'Publish Job';
+      showUpgradeModal('job-limit');
+      return;
+    }
+  }
+
   const title    = document.getElementById('f-title').value.trim();
   const dept     = document.getElementById('f-dept').value.trim();
   const location = document.getElementById('f-location').value.trim();
@@ -1433,15 +1640,27 @@ async function submitApplication(e) {
 
 // ─── AI SCREENING ────────────────────────
 async function renderScreeningSelector() {
-  // Load saved Gemini key — show compact badge if already saved
+  // Gemini key card — behaviour depends on plan
   const config = await getConfig();
-  if (config.geminiKey) {
+  if (plan().managedAI) {
+    // Pro / Power: managed AI — no key required
     document.getElementById('gemini-key-saved').style.display = 'flex';
     document.getElementById('gemini-key-setup').style.display = 'none';
-    document.getElementById('gemini-key-input').value = config.geminiKey;
+    const savedLabel = document.getElementById('gemini-key-saved').querySelector('p.text-sm');
+    if (savedLabel) savedLabel.textContent = 'HireAI Managed AI';
+    const savedSub = document.getElementById('gemini-key-saved').querySelector('p.text-xs');
+    if (savedSub)   savedSub.textContent   = `${plan().name} plan · AI scoring included · no key needed`;
+    if (config.geminiKey) document.getElementById('gemini-key-input').value = config.geminiKey;
   } else {
-    document.getElementById('gemini-key-saved').style.display = 'none';
-    document.getElementById('gemini-key-setup').style.display = 'block';
+    // Free: BYOK
+    if (config.geminiKey) {
+      document.getElementById('gemini-key-saved').style.display = 'flex';
+      document.getElementById('gemini-key-setup').style.display = 'none';
+      document.getElementById('gemini-key-input').value = config.geminiKey;
+    } else {
+      document.getElementById('gemini-key-saved').style.display = 'none';
+      document.getElementById('gemini-key-setup').style.display = 'block';
+    }
   }
 
   const jobs = await getJobs();
@@ -1590,11 +1809,22 @@ async function runScreening() {
   const pendingSnap = screeningJobId
     ? await appsCol().where('jobId','==',screeningJobId).where('status','==','pending').get()
     : { docs: [] };
-  const pendingApps = pendingSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-  const displayCount = pendingApps.length || 6;
-  setStep('load-cvs', 'done', `Found ${displayCount} candidate${displayCount !== 1 ? 's' : ''} to screen`);
-  setProgressBar(35, `${displayCount} candidates loaded`);
-  await delay(350);
+  const allPending   = pendingSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const batchLimit   = plan().batchLimit;
+  const pendingApps  = allPending.slice(0, batchLimit);
+  const skipped      = allPending.length - pendingApps.length;
+  const displayCount = allPending.length || 6;
+  let stepMsg = `Found ${displayCount} candidate${displayCount !== 1 ? 's' : ''} to screen`;
+  if (skipped > 0) stepMsg += ` · ${skipped} skipped (plan limit)`;
+  setStep('load-cvs', 'done', stepMsg);
+  setProgressBar(35, `${pendingApps.length || 6} candidates loaded`);
+  if (skipped > 0) {
+    document.getElementById('thinking-subtitle').textContent =
+      `⚠️ Screening ${pendingApps.length} of ${allPending.length} CVs — ${plan().name} plan limit. Upgrade for more.`;
+    await delay(1200);
+  } else {
+    await delay(350);
+  }
 
   let candidates;
 
