@@ -22,6 +22,13 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .spin { animation: spin 0.7s linear infinite; display: inline-block; }
     .quota-fill { transition: width 0.4s ease; }
+    @keyframes ripple { 0%{transform:scale(1);opacity:0.6} 100%{transform:scale(2.2);opacity:0} }
+    @keyframes stepIn { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:translateX(0)} }
+    .step-row { animation: stepIn 0.25s ease forwards; }
+    .step-dot-active { position:relative; }
+    .step-dot-active::after { content:''; position:absolute; inset:-4px; border-radius:50%; background:#6366f1; opacity:0.25; animation: ripple 1.2s ease-out infinite; }
+    #thinking-progress-bar { transition: width 0.7s cubic-bezier(0.4,0,0.2,1); }
+    @keyframes scanline { 0%{background-position:0% 0%} 100%{background-position:0% 100%} }
     input:focus, textarea:focus, select:focus { outline: 2px solid #6366f1; outline-offset: -2px; border-color: transparent !important; }
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
@@ -910,38 +917,68 @@
           <h1 class="text-3xl font-black">AI Screening</h1>
           <p class="text-slate-500 text-sm mt-1">Claude API · ~$0.003 / CV · max 200 CVs per batch</p>
         </div>
-        <div class="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
-          <!-- Gemini API Key -->
-          <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-3">
-            <div class="flex items-start justify-between gap-4">
-              <div>
-                <p class="text-sm font-black text-amber-800">🔑 Gemini API Key</p>
-                <p class="text-xs text-amber-700 mt-0.5">Required for real AI scoring. Free at <a href="https://aistudio.google.com" target="_blank" class="underline font-bold">aistudio.google.com</a> → Get API key</p>
-              </div>
-              <button onclick="saveGeminiKey()" id="save-gemini-btn" class="flex-shrink-0 bg-amber-800 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-amber-700 transition-colors">Save</button>
-            </div>
-            <input id="gemini-key-input" type="password" placeholder="AIzaSy…" class="w-full px-4 py-3 bg-white border border-amber-200 rounded-2xl text-sm font-mono" />
-            <p id="gemini-key-status" class="text-xs text-amber-600 font-bold" style="display:none"></p>
-          </div>
+        <div class="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
 
-          <div id="screening-job-selector"></div>
-          <div id="pending-badge" style="display:none" class="bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-700"></div>
-          <div>
-            <label class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Job Description &amp; Scoring Criteria</label>
-            <textarea id="screening-jd" rows="5" placeholder="Describe the role, must-haves, nice-to-haves..." class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm resize-none"></textarea>
-          </div>
-          <div onclick="document.getElementById('cv-input').click()" class="border-2 border-dashed border-slate-200 rounded-3xl p-10 text-center cursor-pointer hover:bg-indigo-50/50 hover:border-indigo-200 transition-colors">
-            <input type="file" id="cv-input" multiple class="hidden" onchange="onFilesSelected(event)" />
-            <p class="text-3xl mb-3">📄</p>
-            <p class="font-bold text-slate-600">Drop additional resumes or click to browse</p>
-            <p id="file-count-label" class="text-xs text-slate-400 mt-1">PDF, DOCX · max 200 CVs per batch</p>
-          </div>
-          <div class="flex items-center space-x-4 text-xs text-slate-400 font-bold border-t border-slate-100 pt-4 flex-wrap gap-y-1">
-            <span>Gemini API</span><span class="text-slate-200">·</span><span>Google Drive</span><span class="text-slate-200">·</span><span>OneDrive</span><span class="text-slate-200">·</span><span>Firebase Functions</span>
-          </div>
-          <button onclick="runScreening()" id="screen-btn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center space-x-2 shadow-lg shadow-indigo-200 hover:bg-indigo-500 transition-colors">
-            <span>⚡</span><span id="screen-btn-label">Run AI Screening</span>
-          </button>
+          <!-- ── FORM CONTENT (hidden while AI runs) ── -->
+          <div id="screening-form-content" class="space-y-6">
+            <!-- Gemini API Key -->
+            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-3">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="text-sm font-black text-amber-800">🔑 Gemini API Key</p>
+                  <p class="text-xs text-amber-700 mt-0.5">Required for real AI scoring. Free at <a href="https://aistudio.google.com" target="_blank" class="underline font-bold">aistudio.google.com</a> → Get API key</p>
+                </div>
+                <button onclick="saveGeminiKey()" id="save-gemini-btn" class="flex-shrink-0 bg-amber-800 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-amber-700 transition-colors">Save</button>
+              </div>
+              <input id="gemini-key-input" type="password" placeholder="AIzaSy…" class="w-full px-4 py-3 bg-white border border-amber-200 rounded-2xl text-sm font-mono" />
+              <p id="gemini-key-status" class="text-xs text-amber-600 font-bold" style="display:none"></p>
+            </div>
+            <div id="screening-job-selector"></div>
+            <div id="pending-badge" style="display:none" class="bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-700"></div>
+            <div>
+              <label class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Job Description &amp; Scoring Criteria</label>
+              <textarea id="screening-jd" rows="5" placeholder="Describe the role, must-haves, nice-to-haves..." class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm resize-none"></textarea>
+            </div>
+            <div onclick="document.getElementById('cv-input').click()" class="border-2 border-dashed border-slate-200 rounded-3xl p-10 text-center cursor-pointer hover:bg-indigo-50/50 hover:border-indigo-200 transition-colors">
+              <input type="file" id="cv-input" multiple class="hidden" onchange="onFilesSelected(event)" />
+              <p class="text-3xl mb-3">📄</p>
+              <p class="font-bold text-slate-600">Drop additional resumes or click to browse</p>
+              <p id="file-count-label" class="text-xs text-slate-400 mt-1">PDF, DOCX · max 200 CVs per batch</p>
+            </div>
+            <div class="flex items-center space-x-4 text-xs text-slate-400 font-bold border-t border-slate-100 pt-4 flex-wrap gap-y-1">
+              <span>Gemini API</span><span class="text-slate-200">·</span><span>Google Drive</span><span class="text-slate-200">·</span><span>OneDrive</span><span class="text-slate-200">·</span><span>Firebase Functions</span>
+            </div>
+            <button onclick="runScreening()" id="screen-btn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center space-x-2 shadow-lg shadow-indigo-200 hover:bg-indigo-500 transition-colors">
+              <span>⚡</span><span id="screen-btn-label">Run AI Screening</span>
+            </button>
+          </div><!-- /screening-form-content -->
+
+          <!-- ── THINKING PANEL (shown while AI runs) ── -->
+          <div id="thinking-panel" style="display:none" class="py-4 fade-in">
+            <!-- Header -->
+            <div class="flex items-center space-x-4 mb-10">
+              <div style="width:52px;height:52px;background:#4f46e5;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:22px;animation:spin 2s linear infinite;flex-shrink:0">⚡</div>
+              <div>
+                <p class="text-xl font-black text-slate-900">Gemini AI is thinking</p>
+                <p id="thinking-subtitle" class="text-sm text-slate-400 mt-0.5">Preparing your screening batch…</p>
+              </div>
+            </div>
+
+            <!-- Step list -->
+            <div id="thinking-steps" class="space-y-1 mb-10"></div>
+
+            <!-- Progress bar -->
+            <div class="space-y-2">
+              <div class="flex justify-between text-xs font-bold text-slate-400">
+                <span id="thinking-progress-label">Starting…</span>
+                <span id="thinking-progress-pct">0%</span>
+              </div>
+              <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div id="thinking-progress-bar" class="h-full rounded-full" style="width:0%;background:linear-gradient(90deg,#6366f1,#8b5cf6);transition:width 0.7s cubic-bezier(0.4,0,0.2,1)"></div>
+              </div>
+            </div>
+          </div><!-- /thinking-panel -->
+
         </div>
       </div>
 
@@ -1444,6 +1481,67 @@ function onFilesSelected(e) {
     ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected`
     : 'PDF, DOCX · max 200 CVs per batch';
 }
+
+// ─── THINKING PANEL HELPERS ───────────────
+const THINKING_STEPS = [
+  { id: 'read-jd',    label: 'Reading job description' },
+  { id: 'load-cvs',   label: 'Loading candidate profiles' },
+  { id: 'connect-ai', label: 'Connecting to Gemini API' },
+  { id: 'scoring',    label: 'Gemini is reading & scoring résumés' },
+  { id: 'ranking',    label: 'Ranking candidates by score' },
+  { id: 'saving',     label: 'Saving results to Talent Matrix' },
+];
+
+function showThinkingPanel() {
+  document.getElementById('screening-form-content').style.display = 'none';
+  const panel = document.getElementById('thinking-panel');
+  panel.style.display = 'block';
+  document.getElementById('thinking-subtitle').textContent = 'Preparing your screening batch…';
+  setProgressBar(0, 'Starting…');
+  const stepsEl = document.getElementById('thinking-steps');
+  stepsEl.innerHTML = '';
+  THINKING_STEPS.forEach(s => {
+    const row = document.createElement('div');
+    row.id = 'step-' + s.id;
+    row.className = 'step-row flex items-center space-x-3 py-2';
+    row.innerHTML = `
+      <div id="dot-${s.id}" class="w-4 h-4 rounded-full bg-slate-200 flex-shrink-0 relative"></div>
+      <span id="label-${s.id}" class="text-sm font-semibold text-slate-300">${s.label}</span>`;
+    stepsEl.appendChild(row);
+  });
+}
+
+function setStep(stepId, state, subtitle) {
+  const dot   = document.getElementById('dot-' + stepId);
+  const label = document.getElementById('label-' + stepId);
+  if (!dot) return;
+  if (state === 'active') {
+    dot.className = 'w-4 h-4 rounded-full bg-indigo-500 flex-shrink-0 relative step-dot-active';
+    dot.innerHTML = '';
+    label.className = 'text-sm font-bold text-slate-900';
+  } else if (state === 'done') {
+    dot.className = 'w-4 h-4 rounded-full bg-emerald-500 flex-shrink-0 relative flex items-center justify-center';
+    dot.innerHTML = '<svg width="8" height="6" viewBox="0 0 8 6" fill="none"><path d="M1 3l2 2 4-4" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    label.className = 'text-sm font-semibold text-slate-400';
+  } else if (state === 'error') {
+    dot.className = 'w-4 h-4 rounded-full bg-red-400 flex-shrink-0 relative';
+    dot.innerHTML = '';
+    label.className = 'text-sm font-semibold text-red-500';
+  }
+  if (subtitle) document.getElementById('thinking-subtitle').textContent = subtitle;
+}
+
+function setProgressBar(pct, label) {
+  document.getElementById('thinking-progress-bar').style.width = pct + '%';
+  document.getElementById('thinking-progress-pct').textContent  = Math.round(pct) + '%';
+  if (label) document.getElementById('thinking-progress-label').textContent = label;
+}
+
+function hideThinkingPanel() {
+  document.getElementById('thinking-panel').style.display = 'none';
+  document.getElementById('screening-form-content').style.display = '';
+}
+
 async function runScreening() {
   const jd = document.getElementById('screening-jd').value.trim();
   if (!jd) { alert('Please add a job description first.'); return; }
@@ -1451,63 +1549,95 @@ async function runScreening() {
   const config    = await getConfig();
   const geminiKey = config.geminiKey || '';
   const useAI     = !!geminiKey;
+  const delay     = ms => new Promise(r => setTimeout(r, ms));
 
-  const btn   = document.getElementById('screen-btn');
-  const label = document.getElementById('screen-btn-label');
-  btn.disabled    = true;
-  label.innerHTML = `<span class="spin">⚡</span>&nbsp; ${useAI ? 'Scoring with Gemini AI…' : 'Processing…'}`;
+  document.getElementById('screen-btn').disabled = true;
+  showThinkingPanel();
 
+  // Step 1 — Read JD
+  setStep('read-jd', 'active', 'Reading your job description…');
+  setProgressBar(5, 'Reading job description…');
+  await delay(600);
+  setStep('read-jd', 'done');
+
+  // Step 2 — Load candidates
+  setStep('load-cvs', 'active', 'Loading candidate profiles from database…');
+  setProgressBar(20, 'Loading candidates…');
   const pendingSnap = screeningJobId
     ? await appsCol().where('jobId','==',screeningJobId).where('status','==','pending').get()
     : { docs: [] };
   const pendingApps = pendingSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const displayCount = pendingApps.length || 6;
+  setStep('load-cvs', 'done', `Found ${displayCount} candidate${displayCount !== 1 ? 's' : ''} to screen`);
+  setProgressBar(35, `${displayCount} candidates loaded`);
+  await delay(350);
 
   let candidates;
 
   if (pendingApps.length > 0) {
-    // Build candidate list with whatever content we have
     const rawCandidates = pendingApps.map((a, i) => ({
-      id:        'r-' + Date.now().toString(36) + i,
-      name:      a.name,
-      email:     a.email,
-      resume:    a.resumeName,
-      cvText:    a.cvText || '',
-      jobId:     screeningJobId,
-      jobTitle:  a.jobTitle,
-      status:    'pending'
+      id:       'r-' + Date.now().toString(36) + i,
+      name:     a.name,
+      email:    a.email,
+      resume:   a.resumeName,
+      cvText:   a.cvText || '',
+      jobId:    screeningJobId,
+      jobTitle: a.jobTitle,
+      status:   'pending'
     }));
 
     if (useAI) {
+      setStep('connect-ai', 'active', 'Establishing connection to Gemini API…');
+      setProgressBar(45, 'Connecting to Gemini…');
+      await delay(500);
+      setStep('connect-ai', 'done');
+
+      setStep('scoring', 'active', `Gemini is reading & scoring ${rawCandidates.length} résumé${rawCandidates.length !== 1 ? 's' : ''}…`);
+      setProgressBar(55, 'AI scoring in progress…');
       try {
-        label.innerHTML = '<span class="spin">⚡</span>&nbsp; Gemini is scoring candidates…';
         const scores = await callGemini(geminiKey, jd, rawCandidates);
         candidates = rawCandidates.map((c, i) => ({
           ...c,
           score:     scores[i]?.score     ?? Math.floor(Math.random() * 45) + 50,
           reasoning: scores[i]?.reasoning ?? 'Scored by AI'
         })).sort((a, b) => b.score - a.score);
+        setStep('scoring', 'done');
       } catch (err) {
         console.error('Gemini error:', err);
-        label.innerHTML = '<span class="spin">⚡</span>&nbsp; AI failed — using estimate…';
-        await new Promise(r => setTimeout(r, 1000));
-        candidates = rawCandidates.map((c, i) => ({
+        setStep('scoring', 'error', 'Gemini unavailable — using estimated scores');
+        await delay(800);
+        candidates = rawCandidates.map(c => ({
           ...c, score: Math.floor(Math.random() * 45) + 50, reasoning: 'AI unavailable — estimated score'
         })).sort((a, b) => b.score - a.score);
       }
     } else {
-      await new Promise(r => setTimeout(r, 1800));
-      candidates = rawCandidates.map((c, i) => ({
+      setStep('connect-ai', 'active', 'No API key — generating score estimates…');
+      setProgressBar(45, 'Processing…');
+      await delay(900);
+      setStep('connect-ai', 'done');
+      setStep('scoring', 'active', 'Generating score estimates…');
+      setProgressBar(60, 'Estimating scores…');
+      await delay(1200);
+      candidates = rawCandidates.map(c => ({
         ...c, score: Math.floor(Math.random() * 45) + 50, reasoning: 'Add Gemini API key for real AI scoring'
       })).sort((a, b) => b.score - a.score);
+      setStep('scoring', 'done');
     }
 
-    // Mark apps as screened
+    setStep('ranking', 'active', 'Ranking candidates by score…');
+    setProgressBar(80, 'Ranking candidates…');
+    await delay(400);
+    setStep('ranking', 'done');
+
+    setStep('saving', 'active', 'Saving results to Talent Matrix…');
+    setProgressBar(90, 'Saving to database…');
     const batch = db.batch();
     pendingApps.forEach(a => batch.update(appsCol().doc(a.id), { status: 'screened' }));
     await batch.commit();
+    setStep('saving', 'done');
 
   } else {
-    // No real applicants — demo mode with mock data
+    // Demo mode
     const jobs     = await getJobs();
     const jobTitle = jobs.find(j => j.id === screeningJobId)?.title || 'Role';
     const mockData = [
@@ -1518,39 +1648,69 @@ async function runScreening() {
       { name:'Morgan Davis',  email:'morgan@example.com', cvText:'Junior developer 1 year experience, bootcamp graduate. Learning React and Node. Enthusiastic and fast learner.' },
       { name:'Casey Lee',     email:'casey@example.com',  cvText:'Recent graduate with internship experience in data entry and basic HTML/CSS. Eager to transition into software development.' },
     ];
-
     const rawCandidates = mockData.map((c, i) => ({
       id: 'r-' + i + '-' + Date.now().toString(36), ...c, resume: 'resume.pdf', jobId: screeningJobId, jobTitle, status: 'pending'
     }));
 
     if (useAI) {
+      setStep('connect-ai', 'active', 'Establishing connection to Gemini API…');
+      setProgressBar(45, 'Connecting to Gemini…');
+      await delay(500);
+      setStep('connect-ai', 'done');
+
+      setStep('scoring', 'active', 'Gemini is reading & scoring demo résumés…');
+      setProgressBar(55, 'AI scoring in progress…');
       try {
-        label.innerHTML = '<span class="spin">⚡</span>&nbsp; Gemini is scoring demo candidates…';
         const scores = await callGemini(geminiKey, jd, rawCandidates);
         candidates = rawCandidates.map((c, i) => ({
           ...c,
           score:     scores[i]?.score     ?? 50,
           reasoning: scores[i]?.reasoning ?? 'Scored by AI'
         })).sort((a, b) => b.score - a.score);
+        setStep('scoring', 'done');
       } catch (err) {
         console.error('Gemini error:', err);
+        setStep('scoring', 'error', 'Gemini unavailable — using demo scores');
+        await delay(600);
         candidates = rawCandidates.map((c, i) => ({
           ...c, score: [92,87,79,71,58,44][i], reasoning: 'AI unavailable — using demo scores'
         }));
       }
     } else {
-      await new Promise(r => setTimeout(r, 1800));
+      setStep('connect-ai', 'active', 'No API key — using demo scores…');
+      setProgressBar(45, 'Processing…');
+      await delay(900);
+      setStep('connect-ai', 'done');
+      setStep('scoring', 'active', 'Generating demo score estimates…');
+      setProgressBar(60, 'Using demo scores…');
+      await delay(1200);
       candidates = rawCandidates.map((c, i) => ({
         ...c, score: Math.max(10, Math.min(99, [92,87,79,71,58,44][i] + Math.floor(Math.random()*8)-4)),
         reasoning: 'Add Gemini API key above for real AI scoring'
       }));
+      setStep('scoring', 'done');
     }
+
+    setStep('ranking', 'active', 'Ranking candidates by score…');
+    setProgressBar(80, 'Ranking candidates…');
+    await delay(400);
+    setStep('ranking', 'done');
+
+    setStep('saving', 'active', 'Saving results to Talent Matrix…');
+    setProgressBar(90, 'Saving results…');
+    await delay(350);
+    setStep('saving', 'done');
   }
 
   await saveRankings(candidates);
-  btn.disabled    = false;
-  label.textContent = 'Run AI Screening';
-  selectedFiles   = [];
+  setProgressBar(100, 'Complete!');
+  document.getElementById('thinking-subtitle').textContent = 'Screening complete — opening Talent Matrix ✓';
+  await delay(750);
+
+  hideThinkingPanel();
+  document.getElementById('screen-btn').disabled = false;
+  document.getElementById('screen-btn-label').textContent = 'Run AI Screening';
+  selectedFiles = [];
   document.getElementById('file-count-label').textContent = 'PDF, DOCX · max 200 CVs per batch';
   document.getElementById('cv-input').value = '';
   document.getElementById('pending-badge').style.display = 'none';
