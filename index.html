@@ -4,6 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HireAI — Hire Smarter with AI</title>
+  <!-- Preconnect to CDN origins for faster script fetching -->
+  <link rel="preconnect" href="https://cdn.tailwindcss.com" />
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
+  <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
+  <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com" />
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -20,9 +25,19 @@
     input:focus, textarea:focus, select:focus { outline: 2px solid #6366f1; outline-offset: -2px; border-color: transparent !important; }
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
+    #app-loader { position:fixed;inset:0;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .loader-pulse { animation: pulse 1.4s ease-in-out infinite; }
   </style>
 </head>
 <body class="bg-white antialiased">
+
+<!-- ════════ LOADING SCREEN ════════ -->
+<div id="app-loader">
+  <div style="background:#4f46e5;padding:12px 16px;border-radius:16px;color:#fff;font-size:20px;font-weight:900;letter-spacing:-0.5px" class="loader-pulse">AI</div>
+  <p style="font-size:22px;font-weight:900;color:#0f172a;letter-spacing:-0.5px">HireAI</p>
+  <p style="font-size:13px;color:#94a3b8;font-weight:600">Loading…</p>
+</div>
 
 <!-- ════════════════════════════════════════
      AUTH MODAL
@@ -1082,6 +1097,10 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   auth.onAuthStateChanged(user => {
+    // Hide loading screen as soon as Firebase auth state resolves
+    const loader = document.getElementById('app-loader');
+    if (loader) loader.style.display = 'none';
+
     if (user) {
       currentUser = { uid: user.uid, email: user.email, name: user.displayName || user.email.split('@')[0] };
       showApp();
