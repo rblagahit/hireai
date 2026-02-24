@@ -921,12 +921,24 @@
 
           <!-- ── FORM CONTENT (hidden while AI runs) ── -->
           <div id="screening-form-content" class="space-y-6">
-            <!-- Gemini API Key -->
-            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-3">
+            <!-- Gemini API Key — saved state (shown when key exists) -->
+            <div id="gemini-key-saved" style="display:none" class="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-3.5">
+              <div class="flex items-center space-x-2.5">
+                <span class="text-base">✅</span>
+                <div>
+                  <p class="text-sm font-black text-emerald-800">Gemini AI connected</p>
+                  <p class="text-xs text-emerald-600">API key saved · real AI scoring active</p>
+                </div>
+              </div>
+              <button onclick="changeGeminiKey()" class="text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors underline">Change key</button>
+            </div>
+
+            <!-- Gemini API Key — setup state (shown when no key saved) -->
+            <div id="gemini-key-setup" class="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-3">
               <div class="flex items-start justify-between gap-4">
                 <div>
                   <p class="text-sm font-black text-amber-800">🔑 Gemini API Key</p>
-                  <p class="text-xs text-amber-700 mt-0.5">Required for real AI scoring. Free at <a href="https://aistudio.google.com" target="_blank" class="underline font-bold">aistudio.google.com</a> → Get API key</p>
+                  <p class="text-xs text-amber-700 mt-0.5">One-time setup. Free at <a href="https://aistudio.google.com" target="_blank" class="underline font-bold">aistudio.google.com</a> → Get API key</p>
                 </div>
                 <button onclick="saveGeminiKey()" id="save-gemini-btn" class="flex-shrink-0 bg-amber-800 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-amber-700 transition-colors">Save</button>
               </div>
@@ -1421,14 +1433,15 @@ async function submitApplication(e) {
 
 // ─── AI SCREENING ────────────────────────
 async function renderScreeningSelector() {
-  // Load saved Gemini key
+  // Load saved Gemini key — show compact badge if already saved
   const config = await getConfig();
-  const keyInput = document.getElementById('gemini-key-input');
-  if (keyInput && config.geminiKey) {
-    keyInput.value = config.geminiKey;
-    const status = document.getElementById('gemini-key-status');
-    status.textContent = '✅ API key saved';
-    status.style.display = 'block';
+  if (config.geminiKey) {
+    document.getElementById('gemini-key-saved').style.display = 'flex';
+    document.getElementById('gemini-key-setup').style.display = 'none';
+    document.getElementById('gemini-key-input').value = config.geminiKey;
+  } else {
+    document.getElementById('gemini-key-saved').style.display = 'none';
+    document.getElementById('gemini-key-setup').style.display = 'block';
   }
 
   const jobs = await getJobs();
@@ -1471,9 +1484,20 @@ async function saveGeminiKey() {
   if (!key) { status.textContent = '⚠️ Enter a key first.'; status.style.display = 'block'; return; }
   btn.textContent = 'Saving…';
   await saveConfig({ geminiKey: key });
-  status.textContent  = '✅ API key saved';
-  status.style.display = 'block';
   btn.textContent = 'Save';
+  status.style.display = 'none';
+  // Collapse to the saved badge
+  document.getElementById('gemini-key-saved').style.display = 'flex';
+  document.getElementById('gemini-key-setup').style.display = 'none';
+}
+
+function changeGeminiKey() {
+  document.getElementById('gemini-key-saved').style.display = 'none';
+  document.getElementById('gemini-key-setup').style.display = 'block';
+  const inp = document.getElementById('gemini-key-input');
+  inp.value = '';
+  document.getElementById('gemini-key-status').style.display = 'none';
+  inp.focus();
 }
 function onFilesSelected(e) {
   selectedFiles = Array.from(e.target.files);
