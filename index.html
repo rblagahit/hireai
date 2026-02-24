@@ -1289,16 +1289,16 @@ async function createJob(e) {
   const quota    = parseInt(document.getElementById('f-quota').value) || 200;
   const desc     = document.getElementById('f-desc').value.trim();
   await jobsCol().add({ title, dept, location, type, quota, desc, applications: 0, status: 'active', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+  // Reset form immediately — don't block on the list re-fetch
   ['f-title','f-dept','f-location','f-desc'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-quota').value = '200';
   document.getElementById('job-form-wrap').style.display = 'none';
   btn.disabled    = false;
   btn.textContent = 'Publish Job';
-  await renderJobs();
+  renderJobs(); // fire-and-forget — list updates in background
 }
 async function renderJobs() {
   const el = document.getElementById('jobs-list');
-  el.innerHTML = '<p class="text-slate-400 text-sm font-bold px-2 py-4">Loading…</p>';
   const [jobs, apps] = await Promise.all([getJobs(), getApplications()]);
   if (!jobs.length) {
     el.innerHTML = `<div class="bg-white border-2 border-dashed border-slate-200 rounded-[2rem] p-20 text-center">
