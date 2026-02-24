@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HireAI — Hire Smarter with AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { -webkit-font-smoothing: antialiased; }
+    .hidden-el { display: none !important; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-in { animation: fadeIn 0.22s ease; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 0.7s linear infinite; display: inline-block; }
+    .quota-fill { transition: width 0.4s ease; }
+    input:focus, textarea:focus, select:focus { outline: 2px solid #6366f1; outline-offset: -2px; border-color: transparent !important; }
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
+  </style>
+</head>
+<body class="bg-white antialiased">
+
+<!-- ════════════════════════════════════════
+     AUTH MODAL
+════════════════════════════════════════ -->
+<div id="auth-modal" style="display:none" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+  <div class="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl relative fade-in">
+    <button onclick="closeAuth()" class="absolute top-6 right-6 text-slate-400 hover:text-slate-700 text-xl font-bold">✕</button>
+    <h2 id="auth-title" class="text-2xl font-black mb-1 text-center">Welcome back</h2>
+    <p id="auth-sub" class="text-center text-slate-400 text-sm mb-8">Sign in to HireAI</p>
+    <form onsubmit="handleAuth(event)" class="space-y-4">
+      <input id="auth-name" placeholder="Company / Your name" class="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm" />
+      <input id="auth-email" type="email" required placeholder="Email *" class="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm" />
+      <input id="auth-password" type="password" required placeholder="Password *" class="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm" />
+      <p id="auth-error" style="display:none" class="text-xs text-red-500 font-bold"></p>
+      <button type="submit" class="w-full bg-slate-900 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-slate-800 transition-colors">Continue</button>
+    </form>
+    <p class="text-center text-sm text-slate-400 mt-6">
+      <span id="auth-toggle-text">Don't have an account?</span>
+      <button onclick="toggleAuthMode()" id="auth-toggle-btn" class="font-bold text-indigo-600 ml-1">Sign up</button>
+    </p>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     APPLY MODAL (public-facing candidate view)
+════════════════════════════════════════ -->
+<div id="apply-modal" style="display:none" class="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
+  <div class="bg-white w-full max-w-lg rounded-[2.5rem] p-10 shadow-2xl relative fade-in">
+    <button onclick="closeApply()" class="absolute top-6 right-6 text-slate-400 hover:text-slate-700 text-xl font-bold">✕</button>
+
+    <!-- Normal apply form -->
+    <div id="apply-form-wrap">
+      <p id="apply-job-label" class="text-xs font-black text-indigo-600 uppercase tracking-widest mb-2"></p>
+      <h2 class="text-2xl font-black mb-1">Apply for this role</h2>
+      <p class="text-slate-400 text-sm mb-8">Upload your resume and we'll be in touch.</p>
+      <form onsubmit="submitApplication(event)" class="space-y-4">
+        <input id="apply-name" required placeholder="Full name *" class="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm" />
+        <div>
+          <input id="apply-email" type="email" required placeholder="Email address *" class="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm" />
+          <p class="text-xs text-slate-400 mt-1.5 ml-1">Used to send interview invites or status updates — nothing else.</p>
+        </div>
+        <div onclick="document.getElementById('resume-input').click()"
+          class="border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center cursor-pointer hover:bg-indigo-50/50 hover:border-indigo-200 transition-colors">
+          <input type="file" id="resume-input" accept=".pdf,.doc,.docx" class="hidden" onchange="onResumeSelected(event)" />
+          <p class="text-3xl mb-2">📎</p>
+          <p class="font-bold text-slate-600 text-sm">Upload Resume</p>
+          <p id="resume-label" class="text-xs text-slate-400 mt-1">PDF or DOC / DOCX · max 10 MB</p>
+        </div>
+        <p id="apply-error" style="display:none" class="text-xs text-red-500 font-bold"></p>
+        <button type="submit" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-indigo-500 transition-colors">
+          Submit Application
+        </button>
+        <p class="text-center text-xs text-slate-400">Your email is only used to notify you of interview scheduling or application status.</p>
+      </form>
+    </div>
+
+    <!-- Success state -->
+    <div id="apply-success" style="display:none" class="text-center py-8 fade-in">
+      <p class="text-5xl mb-4">✅</p>
+      <h3 class="text-2xl font-black text-slate-900 mb-2">Application sent!</h3>
+      <p class="text-slate-500 text-sm">We'll review your resume and reach out via email if you're shortlisted.</p>
+      <button onclick="closeApply()" class="mt-8 bg-indigo-600 text-white px-8 py-3 rounded-2xl font-bold hover:bg-indigo-500 transition-colors">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     REJECTION LETTER MODAL
+════════════════════════════════════════ -->
+<div id="reject-modal" style="display:none" class="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+  <div class="bg-white w-full max-w-2xl rounded-[2.5rem] p-10 shadow-2xl relative fade-in max-h-[90vh] overflow-y-auto">
+    <button onclick="closeRejectModal()" class="absolute top-6 right-6 text-slate-400 hover:text-slate-700 text-xl font-bold">✕</button>
+    <h2 class="text-xl font-black mb-1">Rejection Letter</h2>
+    <p id="reject-to-label" class="text-sm text-slate-400 mb-6">To: —</p>
+    <div id="reject-preview" class="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed mb-6 font-mono"></div>
+    <div class="flex flex-wrap gap-3">
+      <button onclick="openMailtoReject()" class="bg-slate-900 text-white px-5 py-3 rounded-2xl font-bold text-sm flex items-center space-x-2 hover:bg-slate-800 transition-colors">
+        <span>📧</span><span>Open in Email</span>
+      </button>
+      <button onclick="copyRejectText()" id="copy-reject-btn" class="border border-slate-200 px-5 py-3 rounded-2xl font-bold text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+        📋 Copy Text
+      </button>
+      <button onclick="confirmReject()" class="border border-red-200 text-red-600 px-5 py-3 rounded-2xl font-bold text-sm hover:bg-red-50 transition-colors ml-auto">
+        ✓ Mark as Rejected
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     LANDING PAGE
+════════════════════════════════════════ -->
+<div id="page-landing">
+
+  <nav id="landing-nav" class="fixed w-full z-50 transition-all py-6">
+    <div class="max-w-7xl mx-auto px-6 flex justify-between items-center">
+      <div class="flex items-center space-x-2">
+        <div class="bg-indigo-600 p-1.5 rounded-lg text-white text-xs font-black">AI</div>
+        <span class="text-xl font-black tracking-tight">HireAI</span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <button onclick="openAuth('login')" class="text-sm font-bold text-slate-700">Sign In</button>
+        <button onclick="openAuth('register')" class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-indigo-500 transition-colors">Get Started Free</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="max-w-7xl mx-auto px-6">
+
+    <!-- ── HERO ── -->
+    <section class="pt-44 pb-16 text-center space-y-8">
+      <div class="inline-flex items-center space-x-2 bg-indigo-50 border border-indigo-100 px-4 py-2 rounded-full">
+        <span class="text-indigo-600">⚡</span>
+        <span class="text-xs font-black text-indigo-600 uppercase tracking-widest">Build HireAI in 17 Days</span>
+      </div>
+      <h1 class="text-6xl font-black text-slate-900 leading-tight max-w-4xl mx-auto">
+        Post jobs free.<br /><span class="text-indigo-600">Screen smarter</span> with AI.
+      </h1>
+      <p class="text-xl text-slate-500 max-w-2xl mx-auto">
+        The agentic hiring platform that turns volume applications into ranked, decision-ready talent — in minutes.
+      </p>
+      <div class="flex items-center justify-center space-x-4 flex-wrap gap-y-3">
+        <button onclick="openAuth('register')" class="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-2xl shadow-indigo-200 hover:bg-indigo-500 transition-colors">
+          Post Your First Job →
+        </button>
+        <button onclick="openAuth('login')" class="border border-slate-200 px-8 py-4 rounded-2xl font-bold text-slate-700 hover:bg-slate-50 transition-colors">Sign In</button>
+      </div>
+    </section>
+
+    <!-- ── INFOGRAPHIC 1: PIPELINE ── -->
+    <section class="pb-16">
+      <div class="bg-slate-900 rounded-[2.5rem] p-10 relative overflow-hidden">
+        <!-- subtle grid bg -->
+        <div class="absolute inset-0 opacity-5" style="background-image: radial-gradient(circle, #fff 1px, transparent 1px); background-size: 28px 28px;"></div>
+        <p class="text-xs font-black text-slate-500 uppercase tracking-widest text-center mb-10">5-Module Product Pipeline</p>
+        <div class="flex items-start justify-between relative">
+          <!-- connector line -->
+          <div class="absolute top-7 left-0 right-0 h-px" style="background: linear-gradient(90deg, transparent, #4f46e5 20%, #7c3aed 40%, #d97706 60%, #db2777 80%, transparent); opacity: 0.4;"></div>
+
+          <!-- Module 1 -->
+          <div class="relative z-10 flex flex-col items-center text-center w-1/5 px-3">
+            <div class="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center mb-4 text-2xl">💼</div>
+            <p class="text-sm font-black text-emerald-400 mb-1">Job Posting</p>
+            <p class="text-xs text-slate-500 leading-snug">∞ free posts<br/>Public apply page<br/>Shareable URLs</p>
+            <span class="mt-3 text-xs font-bold text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">Free</span>
+          </div>
+
+          <!-- arrow -->
+          <div class="relative z-10 self-center pb-10 text-slate-600 text-lg font-black">→</div>
+
+          <!-- Module 2 -->
+          <div class="relative z-10 flex flex-col items-center text-center w-1/5 px-3">
+            <div class="w-14 h-14 rounded-2xl bg-violet-500/20 border border-violet-500/40 flex items-center justify-center mb-4 text-2xl">🧠</div>
+            <p class="text-sm font-black text-violet-400 mb-1">AI Screening</p>
+            <p class="text-xs text-slate-500 leading-snug">Claude API<br/>200 CVs / batch<br/>~$0.003 per CV</p>
+            <span class="mt-3 text-xs font-bold text-violet-400 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-full">Pro</span>
+          </div>
+
+          <!-- arrow -->
+          <div class="relative z-10 self-center pb-10 text-slate-600 text-lg font-black">→</div>
+
+          <!-- Module 3 -->
+          <div class="relative z-10 flex flex-col items-center text-center w-1/5 px-3">
+            <div class="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center mb-4 text-2xl">🛡️</div>
+            <p class="text-sm font-black text-amber-400 mb-1">Quota Guard</p>
+            <p class="text-xs text-slate-500 leading-snug">IP fingerprint<br/>Soft 80% / Hard 100%<br/>No auth needed</p>
+            <span class="mt-3 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">Pro</span>
+          </div>
+
+          <!-- arrow -->
+          <div class="relative z-10 self-center pb-10 text-slate-600 text-lg font-black">→</div>
+
+          <!-- Module 4 -->
+          <div class="relative z-10 flex flex-col items-center text-center w-1/5 px-3">
+            <div class="w-14 h-14 rounded-2xl bg-pink-500/20 border border-pink-500/40 flex items-center justify-center mb-4 text-2xl">📊</div>
+            <p class="text-sm font-black text-pink-400 mb-1">Talent Matrix</p>
+            <p class="text-xs text-slate-500 leading-snug">Top 5 → Calendar<br/>Rejection letters<br/>Score breakdown</p>
+            <span class="mt-3 text-xs font-bold text-pink-400 bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 rounded-full">Pro</span>
+          </div>
+
+          <!-- arrow -->
+          <div class="relative z-10 self-center pb-10 text-slate-600 text-lg font-black">→</div>
+
+          <!-- Module 5 -->
+          <div class="relative z-10 flex flex-col items-center text-center w-1/5 px-3 opacity-50">
+            <div class="w-14 h-14 rounded-2xl bg-sky-500/20 border border-sky-500/40 border-dashed flex items-center justify-center mb-4 text-2xl">📈</div>
+            <p class="text-sm font-black text-sky-400 mb-1">Analytics</p>
+            <p class="text-xs text-slate-500 leading-snug">Funnel metrics<br/>Conversion rates<br/>Pipeline health</p>
+            <span class="mt-3 text-xs font-bold text-slate-500 bg-slate-700 border border-slate-600 px-2 py-0.5 rounded-full">Soon</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── INFOGRAPHIC 2: KPI METRICS ── -->
+    <section class="pb-16">
+      <div class="grid grid-cols-4 gap-4">
+        <div class="bg-indigo-600 rounded-[1.5rem] p-7 text-white relative overflow-hidden">
+          <div class="absolute -top-4 -right-4 text-8xl opacity-10 font-black">%</div>
+          <p class="text-5xl font-black mb-2">94.2<span class="text-2xl">%</span></p>
+          <p class="text-indigo-200 text-sm font-bold">Match Accuracy</p>
+          <p class="text-indigo-300 text-xs mt-1">Claude API scoring vs manual review</p>
+        </div>
+        <div class="bg-slate-900 rounded-[1.5rem] p-7 text-white relative overflow-hidden">
+          <div class="absolute -top-4 -right-4 text-8xl opacity-10 font-black">⚡</div>
+          <p class="text-5xl font-black mb-2">&lt;2<span class="text-2xl text-slate-400">min</span></p>
+          <p class="text-slate-300 text-sm font-bold">Screen 200 CVs</p>
+          <p class="text-slate-500 text-xs mt-1">End-to-end ranked output</p>
+        </div>
+        <div class="bg-slate-900 rounded-[1.5rem] p-7 text-white relative overflow-hidden">
+          <div class="absolute -top-4 -right-4 text-8xl opacity-10 font-black">📅</div>
+          <p class="text-5xl font-black mb-2">17<span class="text-2xl text-slate-400">d</span></p>
+          <p class="text-slate-300 text-sm font-bold">Full MVP Build</p>
+          <p class="text-slate-500 text-xs mt-1">3 phases · 5 modules · production-ready</p>
+        </div>
+        <div class="bg-slate-900 rounded-[1.5rem] p-7 text-white relative overflow-hidden">
+          <div class="absolute -top-4 -right-4 text-8xl opacity-10 font-black">∞</div>
+          <p class="text-5xl font-black mb-2">∞</p>
+          <p class="text-slate-300 text-sm font-bold">Job Posts</p>
+          <p class="text-slate-500 text-xs mt-1">Free forever — no cap, no expiry</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── INFOGRAPHIC 3: FEATURE SCOPE ── -->
+    <section class="pb-20">
+      <div class="flex items-end justify-between mb-8">
+        <div>
+          <h2 class="text-2xl font-black text-slate-900">Feature Scope</h2>
+          <p class="text-slate-500 text-sm mt-1">17-day MVP on the left · Month 2 deferrals faded on the right</p>
+        </div>
+        <div class="flex items-center space-x-4 text-xs font-bold">
+          <span class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded-full bg-indigo-500 inline-block"></span><span class="text-slate-500">In Scope</span></span>
+          <span class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded-full bg-slate-300 inline-block border border-dashed border-slate-400"></span><span class="text-slate-400">Month 2</span></span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-6">
+        <!-- MVP Column -->
+        <div class="space-y-3">
+          <p class="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center space-x-2 mb-4">
+            <span class="w-1.5 h-4 bg-indigo-600 rounded-full inline-block"></span><span>MVP — 17 Days (11.5d total)</span>
+          </p>
+
+          <!-- Feature card helper: name | tier | phase | days bar -->
+          <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center space-x-2">
+                <span class="text-lg">💼</span>
+                <span class="font-black text-slate-900 text-sm">Job Posting Tool</span>
+                <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg">Free</span>
+              </div>
+              <span class="text-xs font-bold text-slate-400">Ph.1</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-emerald-400 rounded-full" style="width:30%"></div>
+              </div>
+              <span class="text-sm font-black text-indigo-600 w-8 text-right">3.5d</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-2">Form + DB · Apply Page · URL + Board · Auto-trigger</p>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center space-x-2">
+                <span class="text-lg">🧠</span>
+                <span class="font-black text-slate-900 text-sm">AI Resume Screening</span>
+                <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">Pro</span>
+              </div>
+              <span class="text-xs font-bold text-slate-400">Ph.1</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-violet-500 rounded-full" style="width:35%"></div>
+              </div>
+              <span class="text-sm font-black text-indigo-600 w-8 text-right">4d</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-2">Claude API · Google Drive · OneDrive · 200 CV batch cap</p>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center space-x-2">
+                <span class="text-lg">📊</span>
+                <span class="font-black text-slate-900 text-sm">Talent Matrix</span>
+                <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">Pro</span>
+              </div>
+              <span class="text-xs font-bold text-slate-400">Ph.2</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-pink-500 rounded-full" style="width:18%"></div>
+              </div>
+              <span class="text-sm font-black text-indigo-600 w-8 text-right">2d</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-2">Ranked view · Top 5 → Google Calendar · Rejection letters</p>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center space-x-2">
+                <span class="text-lg">🛡️</span>
+                <span class="font-black text-slate-900 text-sm">Anonymous Quota</span>
+                <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">Pro</span>
+              </div>
+              <span class="text-xs font-bold text-slate-400">Ph.3</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-amber-400 rounded-full" style="width:18%"></div>
+              </div>
+              <span class="text-sm font-black text-indigo-600 w-8 text-right">2d</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-2">IP fingerprint · Soft 80% warn · Hard cap · Real-time counter</p>
+          </div>
+
+          <!-- Total bar -->
+          <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex items-center justify-between">
+            <div>
+              <p class="text-xs font-black text-indigo-600 uppercase tracking-wide">Total MVP Build</p>
+              <div class="flex items-center space-x-2 mt-2">
+                <div class="w-32 h-2 bg-indigo-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-indigo-600 rounded-full" style="width:68%"></div>
+                </div>
+                <span class="text-xs text-indigo-400">11.5 of 17 days</span>
+              </div>
+            </div>
+            <span class="text-3xl font-black text-indigo-600">11.5d</span>
+          </div>
+        </div>
+
+        <!-- Month 2 Column -->
+        <div class="space-y-3 opacity-40">
+          <p class="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center space-x-2 mb-4">
+            <span class="w-1.5 h-4 bg-slate-300 rounded-full inline-block"></span><span>Month 2 — Deferred (13d total)</span>
+          </p>
+
+          <div class="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center space-x-2">
+                <span class="text-lg">🔗</span>
+                <span class="font-black text-slate-500 text-sm">ATS Integrations</span>
+                <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">Pro</span>
+              </div>
+              <span class="text-xs font-bold text-slate-400">Ph.4</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <div class="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden"><div class="h-full bg-slate-400 rounded-full" style="width:38%"></div></div>
+              <span class="text-sm font-black text-slate-400 w-8 text-right">5d</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-2">Greenhouse · Lever · Workday</p>
+          </div>
+
+          <div class="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center space-x-2">
+                <span class="text-lg">📧</span>
+                <span class="font-black text-slate-500 text-sm">Email-in Apply</span>
+                <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">Pro</span>
+              </div>
+              <span class="text-xs font-bold text-slate-400">Ph.4</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <div class="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden"><div class="h-full bg-slate-400 rounded-full" style="width:23%"></div></div>
+              <span class="text-sm font-black text-slate-400 w-8 text-right">3d</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-2">Inbound parsing · Auto-attach to job</p>
+          </div>
+
+          <div class="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center space-x-2">
+                <span class="text-lg">🪟</span>
+                <span class="font-black text-slate-500 text-sm">Embed Widget</span>
+                <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">Pro</span>
+              </div>
+              <span class="text-xs font-bold text-slate-400">Ph.4</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <div class="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden"><div class="h-full bg-slate-400 rounded-full" style="width:15%"></div></div>
+              <span class="text-sm font-black text-slate-400 w-8 text-right">2d</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-2">iFrame job board · Custom domain</p>
+          </div>
+
+          <div class="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center space-x-2">
+                <span class="text-lg">👥</span>
+                <span class="font-black text-slate-500 text-sm">Multi-seat</span>
+                <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-lg">Pro</span>
+              </div>
+              <span class="text-xs font-bold text-slate-400">Ph.4</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <div class="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden"><div class="h-full bg-slate-400 rounded-full" style="width:23%"></div></div>
+              <span class="text-sm font-black text-slate-400 w-8 text-right">3d</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-2">Team invites · Role management</p>
+          </div>
+
+          <div class="bg-slate-100 border border-dashed border-slate-200 rounded-2xl p-4 flex items-center justify-between">
+            <div>
+              <p class="text-xs font-black text-slate-400 uppercase tracking-wide">Month 2 Total</p>
+              <div class="flex items-center space-x-2 mt-2">
+                <div class="w-32 h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div class="h-full bg-slate-400 rounded-full" style="width:100%"></div>
+                </div>
+              </div>
+            </div>
+            <span class="text-3xl font-black text-slate-400">13d</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── INFOGRAPHIC 4: BUILD TIMELINE (Phase 1) ── -->
+    <section class="pb-20">
+      <h2 class="text-2xl font-black text-slate-900 mb-1">Phase 1 — Foundation <span class="text-slate-400 font-normal text-lg">(Days 1–9)</span></h2>
+      <p class="text-slate-500 text-sm mb-8">Core infrastructure shipped in the first sprint.</p>
+
+      <!-- Day timeline ruler -->
+      <div class="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm mb-6">
+        <p class="text-xs font-black text-slate-400 uppercase tracking-widest mb-5">Build Timeline — 9 Days</p>
+        <div class="relative">
+          <!-- ruler track -->
+          <div class="h-2 bg-slate-100 rounded-full mb-6 relative overflow-hidden">
+            <div class="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-400 via-violet-500 to-pink-500 rounded-full" style="width:53%"></div>
+          </div>
+          <!-- day labels -->
+          <div class="flex justify-between text-xs text-slate-400 font-bold -mt-2 mb-6">
+            <span>Day 1</span><span>Day 2</span><span>Day 3</span><span>Day 4</span><span>Day 5</span><span>Day 6</span><span>Day 7</span><span>Day 8</span><span>Day 9</span>
+          </div>
+          <!-- feature bars -->
+          <div class="space-y-3">
+            <div class="flex items-center space-x-4">
+              <span class="text-xs font-bold text-slate-500 w-36 text-right flex-shrink-0">Form + DB</span>
+              <div class="flex-1 relative h-7 bg-slate-50 rounded-xl overflow-hidden border border-slate-100">
+                <div class="absolute inset-y-0 left-0 bg-emerald-400/20 border-r-2 border-emerald-400 flex items-center pl-2" style="width:5.5%">
+                </div>
+                <span class="absolute inset-y-0 flex items-center text-xs font-bold text-emerald-600 pl-2">0.5d</span>
+              </div>
+            </div>
+            <div class="flex items-center space-x-4">
+              <span class="text-xs font-bold text-slate-500 w-36 text-right flex-shrink-0">Public Apply Page</span>
+              <div class="flex-1 relative h-7 bg-slate-50 rounded-xl overflow-hidden border border-slate-100">
+                <div class="absolute inset-y-0 bg-indigo-400/20 border-r-2 border-indigo-400" style="left:5.5%; width:16.5%"></div>
+                <span class="absolute inset-y-0 flex items-center text-xs font-bold text-indigo-600" style="left:7%">1.5d</span>
+              </div>
+            </div>
+            <div class="flex items-center space-x-4">
+              <span class="text-xs font-bold text-slate-500 w-36 text-right flex-shrink-0">URL + Job Board</span>
+              <div class="flex-1 relative h-7 bg-slate-50 rounded-xl overflow-hidden border border-slate-100">
+                <div class="absolute inset-y-0 bg-violet-400/20 border-r-2 border-violet-400" style="left:22%; width:5.5%"></div>
+                <span class="absolute inset-y-0 flex items-center text-xs font-bold text-violet-600" style="left:24%">0.5d</span>
+              </div>
+            </div>
+            <div class="flex items-center space-x-4">
+              <span class="text-xs font-bold text-slate-500 w-36 text-right flex-shrink-0">Auto-trigger AI</span>
+              <div class="flex-1 relative h-7 bg-slate-50 rounded-xl overflow-hidden border border-slate-100">
+                <div class="absolute inset-y-0 bg-pink-400/20 border-r-2 border-pink-400" style="left:27.5%; width:11%"></div>
+                <span class="absolute inset-y-0 flex items-center text-xs font-bold text-pink-600" style="left:29%">1d</span>
+              </div>
+            </div>
+            <div class="flex items-center space-x-4">
+              <span class="text-xs font-bold text-slate-500 w-36 text-right flex-shrink-0">AI Screening</span>
+              <div class="flex-1 relative h-7 bg-slate-50 rounded-xl overflow-hidden border border-slate-100">
+                <div class="absolute inset-y-0 bg-violet-500/20 border-r-2 border-violet-500" style="left:38.5%; width:44%"></div>
+                <span class="absolute inset-y-0 flex items-center text-xs font-bold text-violet-700" style="left:40%">4d</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature Cards -->
+      <div class="grid md:grid-cols-3 gap-5">
+        <div class="md:col-span-3 grid grid-cols-5 gap-3">
+          <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xl">📝</span>
+              <span class="text-2xl font-black text-indigo-600">0.5d</span>
+            </div>
+            <p class="font-black text-slate-900 text-sm">Form + DB</p>
+            <p class="text-xs text-slate-400 mt-2 leading-snug">Firestore jobs collection with per-user RLS</p>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xl">📎</span>
+              <span class="text-2xl font-black text-indigo-600">1.5d</span>
+            </div>
+            <p class="font-black text-slate-900 text-sm">Public Apply Page</p>
+            <p class="text-xs text-slate-400 mt-2 leading-snug">Email + PDF/DOC upload, quota check</p>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xl">🔗</span>
+              <span class="text-2xl font-black text-indigo-600">0.5d</span>
+            </div>
+            <p class="font-black text-slate-900 text-sm">URL + Job Board</p>
+            <p class="text-xs text-slate-400 mt-2 leading-snug">hireai.app/jobs/[slug] shareable</p>
+          </div>
+          <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xl">✅</span>
+              <span class="text-2xl font-black text-emerald-500">0d</span>
+            </div>
+            <p class="font-black text-slate-900 text-sm">Standalone Mode</p>
+            <p class="text-xs text-slate-400 mt-2 leading-snug">Already done ✓</p>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xl">⚡</span>
+              <span class="text-2xl font-black text-indigo-600">1d</span>
+            </div>
+            <p class="font-black text-slate-900 text-sm">Auto-trigger AI</p>
+            <p class="text-xs text-slate-400 mt-2 leading-snug">On new apply → queue screening</p>
+          </div>
+        </div>
+
+        <div class="bg-violet-50 border border-violet-200 rounded-[1.5rem] p-7">
+          <div class="flex items-center space-x-3 mb-5">
+            <div class="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center text-xl">🧠</div>
+            <div><p class="font-black text-slate-900">AI Screening</p><p class="text-xs text-violet-600 font-bold">Pro · 4 days</p></div>
+          </div>
+          <div class="space-y-3">
+            <div class="flex items-center space-x-3">
+              <div class="w-2 h-2 rounded-full bg-violet-400 flex-shrink-0"></div>
+              <span class="text-xs text-slate-600">Claude API — ~$0.003 / CV at 50-CV batches</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <div class="w-2 h-2 rounded-full bg-violet-400 flex-shrink-0"></div>
+              <span class="text-xs text-slate-600">Google Drive (OAuth read-only scope)</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <div class="w-2 h-2 rounded-full bg-violet-400 flex-shrink-0"></div>
+              <span class="text-xs text-slate-600">OneDrive via MS Graph — 25 MB limit</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <div class="w-2 h-2 rounded-full bg-violet-400 flex-shrink-0"></div>
+              <span class="text-xs text-slate-600">Hard cap: 200 CVs per run</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-pink-50 border border-pink-200 rounded-[1.5rem] p-7">
+          <div class="flex items-center space-x-3 mb-5">
+            <div class="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center text-xl">📊</div>
+            <div><p class="font-black text-slate-900">Talent Matrix</p><p class="text-xs text-pink-600 font-bold">Pro · Phase 2 · 2 days</p></div>
+          </div>
+          <div class="space-y-3">
+            <div class="flex items-center space-x-3">
+              <div class="w-2 h-2 rounded-full bg-pink-400 flex-shrink-0"></div>
+              <span class="text-xs text-slate-600">Top 5 → Google Calendar invite (with guest email)</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <div class="w-2 h-2 rounded-full bg-pink-400 flex-shrink-0"></div>
+              <span class="text-xs text-slate-600">Others → formatted rejection letter flow</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <div class="w-2 h-2 rounded-full bg-pink-400 flex-shrink-0"></div>
+              <span class="text-xs text-slate-600">Employer edits rejection + invite templates</span>
+            </div>
+            <div class="flex items-center space-x-3">
+              <div class="w-2 h-2 rounded-full bg-pink-400 flex-shrink-0"></div>
+              <span class="text-xs text-slate-600">Status: Invited · Rejected · Pending</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 rounded-[1.5rem] p-7 text-white">
+          <p class="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Phase 1 Cost Estimate</p>
+          <div class="space-y-3">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+              <span class="text-slate-400 text-xs">Claude API (50 CVs)</span>
+              <span class="font-black text-white">$0.15</span>
+            </div>
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+              <span class="text-slate-400 text-xs">Claude API (200 CVs)</span>
+              <span class="font-black text-white">$0.60</span>
+            </div>
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+              <span class="text-slate-400 text-xs">Firebase Firestore</span>
+              <span class="font-black text-emerald-400">Free tier</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-400 text-xs">Google Calendar API</span>
+              <span class="font-black text-emerald-400">Free</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── INFOGRAPHIC 5: QUOTA GUARD FLOW (Phase 3) ── -->
+    <section class="pb-20">
+      <h2 class="text-2xl font-black text-slate-900 mb-1">Phase 3 — Quota Guard <span class="text-slate-400 font-normal text-lg">(Days 14–15)</span></h2>
+      <p class="text-slate-500 text-sm mb-8">The trickiest engineering problem: enforcing apply limits without requiring candidate accounts.</p>
+
+      <div class="bg-amber-50 border border-amber-200 rounded-[2rem] p-8">
+        <div class="flex items-center space-x-3 mb-8">
+          <div class="bg-amber-100 p-2.5 rounded-xl text-xl">🛡️</div>
+          <div>
+            <h3 class="font-black text-slate-900 text-lg">Anonymous Quota Enforcement</h3>
+            <p class="text-xs text-amber-700 font-bold">Pro · Phase 3 · 2 days — Hardest engineering problem in the product</p>
+          </div>
+        </div>
+
+        <!-- Flow diagram -->
+        <div class="flex items-stretch space-x-3 mb-8 overflow-x-auto pb-2">
+
+          <div class="flex-1 min-w-[130px] bg-white border border-amber-200 rounded-2xl p-4 text-center">
+            <p class="text-2xl mb-2">🙋</p>
+            <p class="font-black text-slate-900 text-xs">Candidate Submits</p>
+            <p class="text-xs text-slate-400 mt-1">No account required</p>
+          </div>
+
+          <div class="self-center text-amber-400 font-black text-xl flex-shrink-0">→</div>
+
+          <div class="flex-1 min-w-[130px] bg-white border border-amber-200 rounded-2xl p-4 text-center">
+            <p class="text-2xl mb-2">🔍</p>
+            <p class="font-black text-slate-900 text-xs">IP + Fingerprint</p>
+            <p class="text-xs text-slate-400 mt-1">Composite key lookup</p>
+          </div>
+
+          <div class="self-center text-amber-400 font-black text-xl flex-shrink-0">→</div>
+
+          <div class="flex-1 min-w-[130px] bg-white border border-amber-200 rounded-2xl p-4 text-center">
+            <p class="text-2xl mb-2">🔢</p>
+            <p class="font-black text-slate-900 text-xs">Counter Check</p>
+            <div class="mt-2 space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-400">Soft</span>
+                <span class="font-bold text-amber-600">80%</span>
+              </div>
+              <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-amber-400 rounded-full" style="width:80%"></div>
+              </div>
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-400">Hard</span>
+                <span class="font-bold text-red-600">100%</span>
+              </div>
+              <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-red-500 rounded-full" style="width:100%"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="self-center text-amber-400 font-black text-xl flex-shrink-0">→</div>
+
+          <div class="flex-1 min-w-[140px] space-y-2">
+            <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+              <p class="text-lg">✅</p>
+              <p class="font-black text-emerald-700 text-xs">Allow</p>
+              <p class="text-xs text-slate-400">Under quota</p>
+            </div>
+            <div class="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
+              <p class="text-lg">🚫</p>
+              <p class="font-black text-red-600 text-xs">Block</p>
+              <p class="text-xs text-slate-400">Quota reached</p>
+            </div>
+          </div>
+
+          <div class="self-center text-amber-400 font-black text-xl flex-shrink-0">→</div>
+
+          <div class="flex-1 min-w-[130px] bg-white border border-amber-200 rounded-2xl p-4 text-center">
+            <p class="text-2xl mb-2">📊</p>
+            <p class="font-black text-slate-900 text-xs">Dashboard Update</p>
+            <p class="text-xs text-slate-400 mt-1">Real-time recruiter view</p>
+          </div>
+        </div>
+
+        <!-- Detail grid -->
+        <div class="grid grid-cols-3 gap-3">
+          <div class="bg-white border border-amber-100 rounded-2xl p-4">
+            <p class="text-xs font-black text-amber-700 uppercase tracking-wide mb-2">Storage</p>
+            <p class="text-sm text-slate-700">Firestore counter keyed on <code class="bg-amber-50 px-1 rounded text-xs">IP + fingerprint</code> composite</p>
+          </div>
+          <div class="bg-white border border-amber-100 rounded-2xl p-4">
+            <p class="text-xs font-black text-amber-700 uppercase tracking-wide mb-2">Default Quota</p>
+            <p class="text-sm text-slate-700">200 applications per job post — employer can adjust per role</p>
+          </div>
+          <div class="bg-white border border-amber-100 rounded-2xl p-4">
+            <p class="text-xs font-black text-amber-700 uppercase tracking-wide mb-2">Quota Reset</p>
+            <p class="text-sm text-slate-700">Reset counter → automatically queues a new AI screening batch</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── MONTH 2 ROADMAP ── -->
+    <section class="pb-20">
+      <div class="flex items-center space-x-4 mb-8">
+        <div class="flex-1 h-px bg-slate-200"></div>
+        <div class="flex items-center space-x-2 bg-slate-100 border border-slate-200 px-5 py-2 rounded-full">
+          <span class="text-slate-400 text-sm">🔒</span>
+          <span class="text-xs font-black text-slate-400 uppercase tracking-widest">Month 2 Roadmap — Out of MVP Scope</span>
+        </div>
+        <div class="flex-1 h-px bg-slate-200"></div>
+      </div>
+      <div class="grid grid-cols-4 gap-4 opacity-35">
+        <div class="bg-white border border-dashed border-slate-200 rounded-2xl p-6">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-2xl">🔗</span>
+            <span class="text-xs font-bold text-slate-300 bg-slate-100 px-2 py-0.5 rounded-full">Phase 4 · 5d</span>
+          </div>
+          <p class="font-black text-slate-500 text-sm mb-2">ATS Integrations</p>
+          <p class="text-xs text-slate-400 leading-snug">Greenhouse · Lever · Workday sync</p>
+          <div class="mt-4 h-1 bg-slate-100 rounded-full"><div class="h-full bg-slate-300 rounded-full w-0"></div></div>
+        </div>
+        <div class="bg-white border border-dashed border-slate-200 rounded-2xl p-6">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-2xl">📧</span>
+            <span class="text-xs font-bold text-slate-300 bg-slate-100 px-2 py-0.5 rounded-full">Phase 4 · 3d</span>
+          </div>
+          <p class="font-black text-slate-500 text-sm mb-2">Email-in Apply</p>
+          <p class="text-xs text-slate-400 leading-snug">Inbound parsing · Auto-attach to job</p>
+          <div class="mt-4 h-1 bg-slate-100 rounded-full"><div class="h-full bg-slate-300 rounded-full w-0"></div></div>
+        </div>
+        <div class="bg-white border border-dashed border-slate-200 rounded-2xl p-6">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-2xl">🪟</span>
+            <span class="text-xs font-bold text-slate-300 bg-slate-100 px-2 py-0.5 rounded-full">Phase 4 · 2d</span>
+          </div>
+          <p class="font-black text-slate-500 text-sm mb-2">Embed Widget</p>
+          <p class="text-xs text-slate-400 leading-snug">iFrame job board · Custom domain</p>
+          <div class="mt-4 h-1 bg-slate-100 rounded-full"><div class="h-full bg-slate-300 rounded-full w-0"></div></div>
+        </div>
+        <div class="bg-white border border-dashed border-slate-200 rounded-2xl p-6">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-2xl">👥</span>
+            <span class="text-xs font-bold text-slate-300 bg-slate-100 px-2 py-0.5 rounded-full">Phase 4 · 3d</span>
+          </div>
+          <p class="font-black text-slate-500 text-sm mb-2">Multi-seat</p>
+          <p class="text-xs text-slate-400 leading-snug">Team invites · Role management</p>
+          <div class="mt-4 h-1 bg-slate-100 rounded-full"><div class="h-full bg-slate-300 rounded-full w-0"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── PRICING ── -->
+    <section class="pb-24">
+      <h2 class="text-2xl font-black text-slate-900 mb-2 text-center">Simple Pricing</h2>
+      <p class="text-slate-500 text-center text-sm mb-12">Job posting is free forever. AI is where the magic is.</p>
+      <div class="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        <div class="bg-white border-2 border-slate-200 rounded-[2rem] p-8 flex flex-col">
+          <p class="font-black text-slate-400 text-sm uppercase tracking-wide mb-2">Free</p>
+          <p class="text-5xl font-black text-slate-900 mb-6">$0 <span class="text-slate-400 font-normal text-xl">/ forever</span></p>
+          <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 mb-6">
+            <p class="font-black text-emerald-700 text-sm">Unlimited job posts — always free</p>
+            <p class="text-xs text-emerald-600 mt-1">No cap, no expiry, no credit card.</p>
+          </div>
+          <ul class="space-y-2.5 text-sm flex-1">
+            <li class="flex items-center space-x-2"><span class="text-emerald-500 font-bold">✓</span><span class="text-slate-700">Unlimited job posts</span></li>
+            <li class="flex items-center space-x-2"><span class="text-emerald-500 font-bold">✓</span><span class="text-slate-700">Public apply pages (email + resume)</span></li>
+            <li class="flex items-center space-x-2"><span class="text-emerald-500 font-bold">✓</span><span class="text-slate-700">Shareable job URLs</span></li>
+            <li class="flex items-center space-x-2"><span class="text-slate-300">🔒</span><span class="text-slate-300">AI resume screening</span></li>
+            <li class="flex items-center space-x-2"><span class="text-slate-300">🔒</span><span class="text-slate-300">Talent Matrix + calendar invites</span></li>
+            <li class="flex items-center space-x-2"><span class="text-slate-300">🔒</span><span class="text-slate-300">Rejection letter templates</span></li>
+          </ul>
+          <button onclick="openAuth('register')" class="w-full mt-8 border-2 border-slate-900 text-slate-900 py-3.5 rounded-2xl font-bold hover:bg-slate-50 transition-colors">Get Started Free</button>
+        </div>
+        <div class="bg-slate-900 rounded-[2rem] p-8 flex flex-col">
+          <p class="font-black text-indigo-400 text-sm uppercase tracking-wide mb-2">Pro</p>
+          <p class="text-5xl font-black text-white mb-6">$99 <span class="text-slate-500 font-normal text-xl">/ month</span></p>
+          <ul class="space-y-2.5 text-sm flex-1 mb-8">
+            <li class="flex items-start space-x-2 text-slate-300"><span class="text-indigo-400 font-bold flex-shrink-0">✓</span><span>AI resume screening (unlimited)</span></li>
+            <li class="flex items-start space-x-2 text-slate-300"><span class="text-indigo-400 font-bold flex-shrink-0">✓</span><span>Google Drive &amp; OneDrive import</span></li>
+            <li class="flex items-start space-x-2 text-slate-300"><span class="text-indigo-400 font-bold flex-shrink-0">✓</span><span>Claude API-powered scoring</span></li>
+            <li class="flex items-start space-x-2 text-slate-300"><span class="text-indigo-400 font-bold flex-shrink-0">✓</span><span>Batch processing up to 200 CVs</span></li>
+            <li class="flex items-start space-x-2 text-slate-300"><span class="text-indigo-400 font-bold flex-shrink-0">✓</span><span>Talent Matrix with ranked views</span></li>
+            <li class="flex items-start space-x-2 text-slate-300"><span class="text-indigo-400 font-bold flex-shrink-0">✓</span><span>Google Calendar interview scheduling</span></li>
+            <li class="flex items-start space-x-2 text-slate-300"><span class="text-indigo-400 font-bold flex-shrink-0">✓</span><span>Rejection letter templates</span></li>
+            <li class="flex items-start space-x-2 text-slate-300"><span class="text-indigo-400 font-bold flex-shrink-0">✓</span><span>Anonymous quota enforcement</span></li>
+            <li class="flex items-start space-x-2 text-slate-300"><span class="text-indigo-400 font-bold flex-shrink-0">✓</span><span>Custom scoring criteria</span></li>
+            <li class="flex items-start space-x-2 text-slate-300"><span class="text-indigo-400 font-bold flex-shrink-0">✓</span><span>Export ranked list to CSV</span></li>
+            <li class="flex items-start space-x-2 text-slate-300"><span class="text-indigo-400 font-bold flex-shrink-0">✓</span><span>Priority support</span></li>
+            <li class="flex items-start space-x-2 text-slate-300"><span class="text-indigo-400 font-bold flex-shrink-0">✓</span><span>White-label apply page</span></li>
+          </ul>
+          <button onclick="openAuth('register')" class="w-full bg-indigo-600 text-white py-3.5 rounded-2xl font-bold hover:bg-indigo-500 transition-colors">Start Pro Trial</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div><!-- end #page-landing -->
+
+<!-- ════════════════════════════════════════
+     APP SHELL
+════════════════════════════════════════ -->
+<div id="page-app" style="display:none" class="h-screen bg-slate-50">
+  <div class="flex h-full">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-slate-200 p-6 flex flex-col flex-shrink-0">
+      <div class="flex items-center space-x-2 px-2 mb-10">
+        <div class="bg-indigo-600 p-1.5 rounded-lg text-white text-xs font-black">AI</div>
+        <span class="text-xl font-black tracking-tight">HireAI</span>
+      </div>
+      <nav class="flex-1 space-y-1">
+        <button onclick="showTab('jobs')" id="nav-jobs" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-bold text-sm transition-all bg-indigo-600 text-white shadow-lg">
+          <span>💼</span><span>Job Posts</span>
+        </button>
+        <button onclick="showTab('screening')" id="nav-screening" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-bold text-sm transition-all text-slate-500 hover:bg-slate-50">
+          <span>⚡</span><span>AI Screening</span>
+        </button>
+        <button onclick="showTab('matrix')" id="nav-matrix" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-bold text-sm transition-all text-slate-500 hover:bg-slate-50">
+          <span>📊</span><span>Talent Matrix</span>
+        </button>
+        <button onclick="showTab('templates')" id="nav-templates" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-bold text-sm transition-all text-slate-500 hover:bg-slate-50">
+          <span>✉️</span><span>Email Templates</span>
+        </button>
+      </nav>
+      <div class="border-t border-slate-100 pt-4 space-y-1">
+        <p id="sidebar-email" class="text-xs text-slate-400 font-bold px-4 mb-2 truncate"></p>
+        <button onclick="logout()" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-400 hover:text-red-500 font-bold text-sm transition-colors">
+          <span>↩</span><span>Sign Out</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="flex-1 overflow-y-auto p-10">
+
+      <!-- ── JOB POSTS TAB ── -->
+      <div id="tab-jobs" style="display:block" class="max-w-5xl mx-auto space-y-8">
+        <div class="flex justify-between items-center">
+          <div>
+            <h1 class="text-3xl font-black">Job Posts</h1>
+            <p class="text-slate-500 text-sm mt-1">Free forever · Unlimited posts · Candidates apply with email + resume</p>
+          </div>
+          <button onclick="toggleJobForm()" class="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center space-x-2 shadow-lg shadow-indigo-200 hover:bg-indigo-500 transition-colors">
+            <span>+</span><span>New Job</span>
+          </button>
+        </div>
+
+        <div id="job-form-wrap" style="display:none">
+          <form onsubmit="createJob(event)" class="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm space-y-4 fade-in">
+            <h2 class="font-black text-xl">Create Job Post</h2>
+            <div class="grid grid-cols-2 gap-4">
+              <input id="f-title" required placeholder="Job title *" class="col-span-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm" />
+              <input id="f-dept" placeholder="Department" class="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm" />
+              <input id="f-location" placeholder="Location (e.g. Remote, NYC)" class="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm" />
+              <select id="f-type" class="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm">
+                <option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option>
+              </select>
+              <input id="f-quota" type="number" min="1" value="200" placeholder="Application quota" class="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm" />
+            </div>
+            <textarea id="f-desc" required rows="4" placeholder="Job description and requirements... *" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm resize-none"></textarea>
+            <div class="flex space-x-3">
+              <button type="submit" class="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold text-sm hover:bg-indigo-500 transition-colors">Publish Job</button>
+              <button type="button" onclick="toggleJobForm()" class="border border-slate-200 px-6 py-3 rounded-2xl font-bold text-sm text-slate-600 hover:bg-slate-50">Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        <div id="jobs-list"></div>
+      </div>
+
+      <!-- ── AI SCREENING TAB ── -->
+      <div id="tab-screening" style="display:none" class="max-w-4xl mx-auto space-y-8">
+        <div>
+          <h1 class="text-3xl font-black">AI Screening</h1>
+          <p class="text-slate-500 text-sm mt-1">Claude API · ~$0.003 / CV · max 200 CVs per batch</p>
+        </div>
+        <div class="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+          <div id="screening-job-selector"></div>
+          <div id="pending-badge" style="display:none" class="bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-700"></div>
+          <div>
+            <label class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Job Description &amp; Scoring Criteria</label>
+            <textarea id="screening-jd" rows="5" placeholder="Describe the role, must-haves, nice-to-haves..." class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm resize-none"></textarea>
+          </div>
+          <div onclick="document.getElementById('cv-input').click()" class="border-2 border-dashed border-slate-200 rounded-3xl p-10 text-center cursor-pointer hover:bg-indigo-50/50 hover:border-indigo-200 transition-colors">
+            <input type="file" id="cv-input" multiple class="hidden" onchange="onFilesSelected(event)" />
+            <p class="text-3xl mb-3">📄</p>
+            <p class="font-bold text-slate-600">Drop additional resumes or click to browse</p>
+            <p id="file-count-label" class="text-xs text-slate-400 mt-1">PDF, DOCX · max 200 CVs per batch</p>
+          </div>
+          <div class="flex items-center space-x-4 text-xs text-slate-400 font-bold border-t border-slate-100 pt-4 flex-wrap gap-y-1">
+            <span>Claude API</span><span class="text-slate-200">·</span><span>Google Drive</span><span class="text-slate-200">·</span><span>OneDrive</span><span class="text-slate-200">·</span><span>Firebase Functions</span>
+          </div>
+          <button onclick="runScreening()" id="screen-btn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center space-x-2 shadow-lg shadow-indigo-200 hover:bg-indigo-500 transition-colors">
+            <span>⚡</span><span id="screen-btn-label">Run AI Screening ($5.00 / batch)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ── TALENT MATRIX TAB ── -->
+      <div id="tab-matrix" style="display:none" class="max-w-5xl mx-auto space-y-8">
+        <div class="flex justify-between items-center">
+          <div>
+            <h1 class="text-3xl font-black">Talent Matrix</h1>
+            <p class="text-slate-500 text-sm mt-1">AI-ranked candidates · Top 5 → Google Calendar · Rest → Rejection letter</p>
+          </div>
+          <div id="matrix-legend" style="display:none" class="flex items-center space-x-4 text-xs font-bold">
+            <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span><span class="text-slate-500">Top 5</span></span>
+            <span class="flex items-center space-x-1"><span class="w-2.5 h-2.5 rounded-full bg-slate-300 inline-block"></span><span class="text-slate-500">Others</span></span>
+          </div>
+        </div>
+        <div id="matrix-list"></div>
+      </div>
+
+      <!-- ── EMAIL TEMPLATES TAB ── -->
+      <div id="tab-templates" style="display:none" class="max-w-4xl mx-auto space-y-8">
+        <div>
+          <h1 class="text-3xl font-black">Email Templates</h1>
+          <p class="text-slate-500 text-sm mt-1">Customise the rejection letter and interview invite sent to candidates.</p>
+        </div>
+        <div class="bg-indigo-50 border border-indigo-100 rounded-2xl px-5 py-4 text-sm text-indigo-700">
+          <strong>Available variables:</strong> <code class="bg-white px-1 rounded">{{name}}</code> <code class="bg-white px-1 rounded">{{jobTitle}}</code> <code class="bg-white px-1 rounded">{{company}}</code> <code class="bg-white px-1 rounded">{{senderName}}</code>
+        </div>
+
+        <!-- Rejection Letter -->
+        <div class="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="font-black text-xl">✉️ Rejection Letter</h2>
+              <p class="text-xs text-slate-400 mt-1">Sent to candidates not in the top 5</p>
+            </div>
+            <button onclick="saveRejectionTemplate()" id="save-reject-btn" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors">Save</button>
+          </div>
+          <textarea id="rejection-template" rows="12" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm resize-none font-mono leading-relaxed"></textarea>
+          <div class="border-t border-slate-100 pt-4">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Preview</p>
+            <div id="rejection-preview" class="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-sm text-slate-600 whitespace-pre-wrap font-mono leading-relaxed"></div>
+          </div>
+        </div>
+
+        <!-- Interview Invite -->
+        <div class="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="font-black text-xl">📅 Interview Invite Message</h2>
+              <p class="text-xs text-slate-400 mt-1">Shown in the Google Calendar event description when scheduling interviews</p>
+            </div>
+            <button onclick="saveInviteTemplate()" id="save-invite-btn" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition-colors">Save</button>
+          </div>
+          <textarea id="invite-template" rows="10" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm resize-none font-mono leading-relaxed"></textarea>
+          <div class="border-t border-slate-100 pt-4">
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Preview</p>
+            <div id="invite-preview" class="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-sm text-slate-600 whitespace-pre-wrap font-mono leading-relaxed"></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div><!-- end #page-app -->
+
+<!-- ════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════ -->
+<script>
+
+// ─── DEFAULT TEMPLATES ───────────────────
+const DEFAULT_REJECTION = `Dear {{name}},
+
+Thank you for taking the time to apply for the {{jobTitle}} position at {{company}}.
+
+After careful consideration, we have decided to move forward with other candidates whose experience more closely aligns with our current needs.
+
+We truly appreciate your interest and the effort you put into your application. We encourage you to apply for future opportunities that match your skills and background.
+
+We wish you all the best in your search.
+
+Warm regards,
+{{senderName}}
+{{company}}`;
+
+const DEFAULT_INVITE = `Dear {{name}},
+
+Congratulations! After reviewing your application for the {{jobTitle}} position, we are pleased to invite you to an interview.
+
+We were impressed by your background and believe you could be a great fit for our team.
+
+A calendar invite has been sent to {{email}}. If the proposed time doesn't work for you, please reply to suggest an alternative.
+
+We look forward to speaking with you.
+
+Best regards,
+{{senderName}}
+{{company}}`;
+
+// ─── STATE ───────────────────────────────
+let authMode       = 'login';
+let currentUser    = null;
+let selectedFiles  = [];
+let currentApplyJobId = null;
+let resumeFile     = null;
+let rejectTarget   = null; // { ranking, jobTitle }
+
+// ─── PERSISTENCE ─────────────────────────
+const load  = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch { return d; } };
+const save  = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+
+const getJobs        = () => load('hireai_jobs',        []);
+const saveJobs       = v  => save('hireai_jobs',        v);
+const getApplications= () => load('hireai_applications',[]);
+const saveApplications=v  => save('hireai_applications',v);
+const getRankings    = () => load('hireai_rankings',    []);
+const saveRankings   = v  => save('hireai_rankings',    v);
+const getUsers       = () => load('hireai_users',       {});
+const saveUsers      = v  => save('hireai_users',       v);
+const getSavedUser   = () => load('hireai_user',        null);
+const saveSavedUser  = v  => save('hireai_user',        v);
+const getTemplates   = () => load('hireai_templates',   { rejection: DEFAULT_REJECTION, invite: DEFAULT_INVITE });
+const saveTemplates  = v  => save('hireai_templates',   v);
+
+// ─── INIT ────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  currentUser = getSavedUser();
+  if (currentUser) showApp();
+  window.addEventListener('scroll', () => {
+    const nav = document.getElementById('landing-nav');
+    if (!nav) return;
+    nav.className = window.scrollY > 20
+      ? 'fixed w-full z-50 transition-all py-4 bg-white/80 backdrop-blur-md shadow-sm'
+      : 'fixed w-full z-50 transition-all py-6';
+  });
+});
+
+// ─── AUTH ────────────────────────────────
+function openAuth(mode) {
+  authMode = mode;
+  updateAuthUI();
+  const nameField = document.getElementById('auth-name');
+  nameField.style.display = mode === 'register' ? 'block' : 'none';
+  document.getElementById('auth-modal').style.display = 'flex';
+}
+function closeAuth() {
+  document.getElementById('auth-modal').style.display = 'none';
+  document.getElementById('auth-error').style.display = 'none';
+  ['auth-name','auth-email','auth-password'].forEach(id => document.getElementById(id).value = '');
+}
+function toggleAuthMode() {
+  authMode = authMode === 'login' ? 'register' : 'login';
+  updateAuthUI();
+  document.getElementById('auth-name').style.display = authMode === 'register' ? 'block' : 'none';
+}
+function updateAuthUI() {
+  const isLogin = authMode === 'login';
+  document.getElementById('auth-title').textContent       = isLogin ? 'Welcome back'            : 'Create your account';
+  document.getElementById('auth-sub').textContent         = isLogin ? 'Sign in to HireAI'       : 'Start posting jobs for free';
+  document.getElementById('auth-toggle-text').textContent = isLogin ? "Don't have an account?"  : 'Already have an account?';
+  document.getElementById('auth-toggle-btn').textContent  = isLogin ? 'Sign up'                 : 'Sign in';
+  document.getElementById('auth-error').style.display = 'none';
+}
+function handleAuth(e) {
+  e.preventDefault();
+  const name     = document.getElementById('auth-name').value.trim();
+  const email    = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const errEl    = document.getElementById('auth-error');
+  if (password.length < 6) { showErr(errEl, 'Password must be at least 6 characters.'); return; }
+  const users = getUsers();
+  if (authMode === 'register') {
+    if (users[email]) { showErr(errEl, 'An account with this email already exists.'); return; }
+    users[email] = { email, password, name: name || email.split('@')[0] };
+    saveUsers(users);
+  } else {
+    if (!users[email] || users[email].password !== password) { showErr(errEl, 'Incorrect email or password.'); return; }
+  }
+  currentUser = users[email];
+  saveSavedUser(currentUser);
+  closeAuth();
+  showApp();
+}
+function showErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
+function logout() {
+  currentUser = null; saveSavedUser(null);
+  document.getElementById('page-app').style.display = 'none';
+  document.getElementById('page-landing').style.display = 'block';
+  window.scrollTo(0, 0);
+}
+
+// ─── APP SHELL ───────────────────────────
+function showApp() {
+  document.getElementById('page-landing').style.display = 'none';
+  document.getElementById('page-app').style.display = 'block';
+  document.getElementById('sidebar-email').textContent = currentUser.name || currentUser.email;
+  showTab('jobs');
+}
+function showTab(id) {
+  ['jobs','screening','matrix','templates'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = 'none';
+    document.getElementById('nav-' + t).className =
+      'w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-bold text-sm transition-all text-slate-500 hover:bg-slate-50';
+  });
+  document.getElementById('tab-' + id).style.display = 'block';
+  document.getElementById('tab-' + id).classList.add('fade-in');
+  document.getElementById('nav-' + id).className =
+    'w-full flex items-center space-x-3 px-4 py-3 rounded-xl font-bold text-sm transition-all bg-indigo-600 text-white shadow-lg';
+  if (id === 'jobs')      renderJobs();
+  if (id === 'screening') renderScreeningSelector();
+  if (id === 'matrix')    renderMatrix();
+  if (id === 'templates') renderTemplates();
+}
+
+// ─── JOB POSTS ───────────────────────────
+function toggleJobForm() {
+  const el = document.getElementById('job-form-wrap');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+function createJob(e) {
+  e.preventDefault();
+  const title    = document.getElementById('f-title').value.trim();
+  const dept     = document.getElementById('f-dept').value.trim();
+  const location = document.getElementById('f-location').value.trim();
+  const type     = document.getElementById('f-type').value;
+  const quota    = parseInt(document.getElementById('f-quota').value) || 200;
+  const desc     = document.getElementById('f-desc').value.trim();
+  const slug     = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36);
+  const jobs = getJobs();
+  jobs.unshift({ id: slug, slug, title, dept, location, type, quota, desc, applications: 0, createdAt: Date.now(), status: 'active' });
+  saveJobs(jobs);
+  ['f-title','f-dept','f-location','f-desc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-quota').value = '200';
+  document.getElementById('job-form-wrap').style.display = 'none';
+  renderJobs();
+}
+function renderJobs() {
+  const jobs = getJobs();
+  const apps = getApplications();
+  const el   = document.getElementById('jobs-list');
+  if (!jobs.length) {
+    el.innerHTML = `<div class="bg-white border-2 border-dashed border-slate-200 rounded-[2rem] p-20 text-center">
+      <p class="text-5xl mb-4">💼</p>
+      <p class="font-bold text-slate-400 mb-1">No jobs posted yet</p>
+      <p class="text-sm text-slate-300">Create your first posting — free, always.</p></div>`;
+    return;
+  }
+  el.innerHTML = jobs.map(job => {
+    const jobApps   = apps.filter(a => a.jobId === job.id);
+    const total     = jobApps.length;
+    const pending   = jobApps.filter(a => a.status === 'pending').length;
+    const pct       = Math.min(100, Math.round((total / job.quota) * 100));
+    const bar       = pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-400' : 'bg-emerald-500';
+    const txt       = pct >= 80 ? 'text-amber-600' : 'text-slate-400';
+    const meta      = [job.dept, job.location, job.type].filter(Boolean).join(' · ');
+    return `<div class="bg-white border border-slate-200 rounded-[1.5rem] p-6 shadow-sm mb-4">
+      <div class="flex items-start justify-between mb-4">
+        <div>
+          <h3 class="font-black text-slate-900 text-lg">${esc(job.title)}</h3>
+          ${meta ? `<p class="text-sm text-slate-500 mt-0.5">${esc(meta)}</p>` : ''}
+          ${pending > 0 ? `<span class="mt-2 inline-block bg-indigo-100 text-indigo-700 text-xs font-bold px-2.5 py-1 rounded-lg">${pending} pending review</span>` : ''}
+        </div>
+        <div class="flex items-center space-x-2 flex-shrink-0 ml-4">
+          <button onclick="openApply('${job.id}')"
+            class="flex items-center space-x-1.5 text-xs font-bold border border-emerald-200 text-emerald-700 bg-emerald-50 px-3 py-2 rounded-xl hover:bg-emerald-100 transition-colors">
+            👁️ Apply Page
+          </button>
+          <button onclick="copyLink('${job.slug}')" id="copy-${job.slug}"
+            class="flex items-center space-x-1.5 text-xs font-bold border border-slate-200 text-slate-500 px-3 py-2 rounded-xl hover:bg-slate-50 transition-colors">
+            🔗 Copy Link
+          </button>
+          <button onclick="screenJob('${job.id}')"
+            class="flex items-center space-x-1.5 text-xs font-bold border border-indigo-200 text-indigo-600 px-3 py-2 rounded-xl hover:bg-indigo-50 transition-colors">
+            ⚡ Screen CVs
+          </button>
+        </div>
+      </div>
+      <div>
+        <div class="flex justify-between text-xs font-bold mb-1.5">
+          <span class="${txt}">${total} / ${job.quota} applications</span>
+          <span class="${txt}">${pct}%</span>
+        </div>
+        <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div class="${bar} h-full rounded-full quota-fill" style="width:${pct}%"></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function copyLink(slug) {
+  navigator.clipboard.writeText(`https://hireai.app/jobs/${slug}`).then(() => {
+    const btn = document.getElementById('copy-' + slug);
+    if (!btn) return;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✅ Copied!';
+    btn.classList.add('bg-emerald-50','border-emerald-200','text-emerald-600');
+    setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('bg-emerald-50','border-emerald-200','text-emerald-600'); }, 2000);
+  });
+}
+function screenJob(jobId) {
+  const job = getJobs().find(j => j.id === jobId);
+  showTab('screening');
+  if (job) setTimeout(() => { document.getElementById('screening-jd').value = job.desc; updatePendingBadge(jobId); }, 80);
+}
+
+// ─── APPLY MODAL ─────────────────────────
+function openApply(jobId) {
+  currentApplyJobId = jobId;
+  resumeFile = null;
+  const job = getJobs().find(j => j.id === jobId);
+  document.getElementById('apply-job-label').textContent = job ? job.title : '';
+  document.getElementById('apply-form-wrap').style.display = 'block';
+  document.getElementById('apply-success').style.display = 'none';
+  document.getElementById('apply-error').style.display = 'none';
+  document.getElementById('resume-label').textContent = 'PDF or DOC / DOCX · max 10 MB';
+  ['apply-name','apply-email'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('resume-input').value = '';
+  document.getElementById('apply-modal').style.display = 'flex';
+}
+function closeApply() {
+  document.getElementById('apply-modal').style.display = 'none';
+  currentApplyJobId = null;
+  resumeFile = null;
+}
+function onResumeSelected(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const ok = file.name.match(/\.(pdf|doc|docx)$/i);
+  if (!ok) {
+    document.getElementById('resume-label').textContent = '❌ Only PDF or DOC/DOCX accepted';
+    document.getElementById('resume-input').value = '';
+    resumeFile = null;
+    return;
+  }
+  resumeFile = file;
+  document.getElementById('resume-label').textContent = `✅ ${file.name}`;
+}
+function submitApplication(e) {
+  e.preventDefault();
+  const name  = document.getElementById('apply-name').value.trim();
+  const email = document.getElementById('apply-email').value.trim();
+  const errEl = document.getElementById('apply-error');
+  if (!resumeFile) { showErr(errEl, 'Please upload your resume (PDF or DOC).'); return; }
+  if (!name || !email) { showErr(errEl, 'Please fill in all required fields.'); return; }
+
+  const apps = getApplications();
+  // Check for duplicate email on same job
+  if (apps.find(a => a.jobId === currentApplyJobId && a.email.toLowerCase() === email.toLowerCase())) {
+    showErr(errEl, 'You have already applied for this position.'); return;
+  }
+
+  const newApp = {
+    id:         'app-' + Date.now().toString(36),
+    jobId:      currentApplyJobId,
+    jobTitle:   getJobs().find(j => j.id === currentApplyJobId)?.title || '',
+    name, email,
+    resumeName: resumeFile.name,
+    status:     'pending',
+    appliedAt:  Date.now()
+  };
+  apps.push(newApp);
+  saveApplications(apps);
+
+  // Increment job's application count
+  const jobs = getJobs();
+  const job  = jobs.find(j => j.id === currentApplyJobId);
+  if (job) { job.applications = (job.applications || 0) + 1; saveJobs(jobs); }
+
+  document.getElementById('apply-form-wrap').style.display = 'none';
+  document.getElementById('apply-success').style.display  = 'block';
+}
+
+// ─── AI SCREENING ────────────────────────
+let screeningJobId = null;
+function renderScreeningSelector() {
+  const jobs = getJobs();
+  const el   = document.getElementById('screening-job-selector');
+  if (!jobs.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div>
+    <label class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Select Job to Screen</label>
+    <select id="screening-job-sel" onchange="onScreeningJobChange(this.value)" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm">
+      <option value="">— choose a job post —</option>
+      ${jobs.map(j => `<option value="${j.id}">${esc(j.title)}${j.location ? ' · ' + esc(j.location) : ''}</option>`).join('')}
+    </select></div>`;
+}
+function onScreeningJobChange(jobId) {
+  screeningJobId = jobId || null;
+  const job = getJobs().find(j => j.id === jobId);
+  if (job) document.getElementById('screening-jd').value = job.desc;
+  updatePendingBadge(jobId);
+}
+function updatePendingBadge(jobId) {
+  const badge   = document.getElementById('pending-badge');
+  const pending = getApplications().filter(a => a.jobId === jobId && a.status === 'pending').length;
+  if (pending > 0) {
+    badge.style.display = 'block';
+    badge.textContent   = `📥 ${pending} pending application${pending > 1 ? 's' : ''} ready to screen for this job`;
+  } else {
+    badge.style.display = 'none';
+  }
+}
+function onFilesSelected(e) {
+  selectedFiles = Array.from(e.target.files);
+  document.getElementById('file-count-label').textContent = selectedFiles.length
+    ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected`
+    : 'PDF, DOCX · max 200 CVs per batch';
+}
+function runScreening() {
+  const jd = document.getElementById('screening-jd').value.trim();
+  if (!jd) { alert('Please add a job description first.'); return; }
+
+  const btn   = document.getElementById('screen-btn');
+  const label = document.getElementById('screen-btn-label');
+  btn.disabled = true;
+  label.innerHTML = '<span class="spin">⚡</span>&nbsp; Processing...';
+
+  setTimeout(() => {
+    const apps = getApplications().filter(a => a.jobId === screeningJobId && a.status === 'pending');
+
+    let candidates;
+    if (apps.length > 0) {
+      // Score real applicants
+      candidates = apps.map((a, i) => ({
+        id:        a.id,
+        name:      a.name,
+        email:     a.email,
+        resume:    a.resumeName,
+        score:     Math.floor(Math.random() * 45) + 50, // 50–94
+        reasoning: pickReasoning(i),
+        jobId:     screeningJobId,
+        jobTitle:  a.jobTitle,
+        status:    'pending'
+      })).sort((a, b) => b.score - a.score);
+
+      // Mark those applications as "screened"
+      const allApps = getApplications();
+      apps.forEach(a => { const found = allApps.find(x => x.id === a.id); if (found) found.status = 'screened'; });
+      saveApplications(allApps);
+    } else {
+      // No real applicants — use mock data
+      candidates = [
+        { name:'Alex Rivera',   email:'alex@example.com',   score:92, reasoning:'Strong match — 7 yrs exp, exact stack, led similar-scale team' },
+        { name:'Jordan Chen',   email:'jordan@example.com', score:87, reasoning:'Excellent technical fit, minor gap in leadership experience' },
+        { name:'Sam Patel',     email:'sam@example.com',    score:79, reasoning:'Good skills overlap, resume shows strong growth trajectory' },
+        { name:'Taylor Brooks', email:'taylor@example.com', score:71, reasoning:'Relevant background, 2 of 5 must-haves present' },
+        { name:'Morgan Davis',  email:'morgan@example.com', score:58, reasoning:'Partial fit — junior level, missing key requirements' },
+        { name:'Casey Lee',     email:'casey@example.com',  score:44, reasoning:'Limited relevant experience for the role requirements' },
+      ].map((c, i) => ({
+        ...c,
+        id: 'r-' + i + '-' + Date.now().toString(36),
+        score: Math.max(10, Math.min(99, c.score + Math.floor(Math.random() * 8) - 4)),
+        jobId: screeningJobId,
+        jobTitle: getJobs().find(j => j.id === screeningJobId)?.title || 'Role',
+        status: 'pending'
+      })).sort((a, b) => b.score - a.score);
+    }
+
+    saveRankings(candidates);
+    btn.disabled = false;
+    label.textContent = 'Run AI Screening ($5.00 / batch)';
+    selectedFiles = [];
+    document.getElementById('file-count-label').textContent = 'PDF, DOCX · max 200 CVs per batch';
+    document.getElementById('cv-input').value = '';
+    document.getElementById('pending-badge').style.display = 'none';
+    showTab('matrix');
+  }, 2400);
+}
+function pickReasoning(i) {
+  const pool = [
+    'Strong match — relevant experience and skills align well with requirements',
+    'Excellent technical fit, with demonstrated impact in similar roles',
+    'Good skills overlap, resume shows consistent growth trajectory',
+    'Solid background, meets most core requirements for this position',
+    'Relevant experience, some gaps in required technical areas',
+    'Partial fit — shows potential but lacks key experience',
+    'Limited directly relevant experience for this specific role',
+  ];
+  return pool[Math.min(i, pool.length - 1)];
+}
+
+// ─── TALENT MATRIX ───────────────────────
+function renderMatrix() {
+  const rankings = getRankings();
+  const el       = document.getElementById('matrix-list');
+  const legend   = document.getElementById('matrix-legend');
+
+  if (!rankings.length) {
+    legend.style.display = 'none';
+    el.innerHTML = `<div class="bg-white border-2 border-dashed border-slate-200 rounded-[2rem] p-20 text-center">
+      <p class="text-5xl mb-4">📊</p>
+      <p class="font-bold text-slate-400 mb-1">No results yet</p>
+      <p class="text-sm text-slate-300">Run AI Screening to populate the matrix.</p></div>`;
+    return;
+  }
+  legend.style.display = 'flex';
+
+  el.innerHTML = rankings.map((r, i) => {
+    const isTop5      = i < 5;
+    const medal       = i === 0 ? 'bg-amber-400 text-white' : i === 1 ? 'bg-slate-400 text-white' : i === 2 ? 'bg-amber-700 text-white' : 'bg-slate-100 text-slate-500';
+    const scoreColor  = r.score >= 80 ? 'text-emerald-600' : r.score >= 60 ? 'text-amber-600' : 'text-slate-400';
+    const statusBadge = r.status === 'invited'  ? '<span class="text-xs font-bold bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-lg ml-2">📅 Interview Scheduled</span>'
+                      : r.status === 'rejected' ? '<span class="text-xs font-bold bg-red-50 text-red-500 px-2.5 py-1 rounded-lg ml-2">✉️ Rejection Sent</span>'
+                      : '';
+    const actions = isTop5
+      ? `<button onclick="scheduleInterview('${r.id}')"
+           class="text-xs font-bold border border-indigo-200 text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl hover:bg-indigo-100 transition-colors flex items-center space-x-1 ${r.status === 'invited' ? 'opacity-50' : ''}">
+           📅 <span>Schedule Interview</span>
+         </button>`
+      : `<button onclick="openRejectModal('${r.id}')"
+           class="text-xs font-bold border border-red-100 text-red-500 bg-red-50 px-3 py-2 rounded-xl hover:bg-red-100 transition-colors flex items-center space-x-1 ${r.status === 'rejected' ? 'opacity-50' : ''}">
+           ✉️ <span>Send Rejection</span>
+         </button>`;
+    return `<div class="bg-white border ${isTop5 ? 'border-indigo-100' : 'border-slate-200'} rounded-[1.5rem] p-6 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow mb-3">
+      <div class="flex items-center space-x-4 flex-1 min-w-0">
+        <div class="w-9 h-9 rounded-full flex items-center justify-center font-black text-sm flex-shrink-0 ${medal}">${i + 1}</div>
+        <div class="min-w-0">
+          <div class="flex items-center flex-wrap gap-1">
+            <p class="font-black text-slate-900">${esc(r.name)}</p>
+            ${isTop5 ? '<span class="text-xs font-bold bg-indigo-600 text-white px-2 py-0.5 rounded-md">Top 5</span>' : ''}
+            ${statusBadge}
+          </div>
+          <p class="text-xs text-slate-400 mt-0.5">${esc(r.email)}</p>
+          <p class="text-sm text-slate-500 mt-1">${esc(r.reasoning)}</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-4 flex-shrink-0 ml-6">
+        <div class="text-right">
+          <p class="text-4xl font-black ${scoreColor}">${r.score}</p>
+          <p class="text-xs text-slate-400 font-bold">/ 100</p>
+        </div>
+        <div>${actions}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Google Calendar scheduling
+function scheduleInterview(rankingId) {
+  const rankings = getRankings();
+  const r        = rankings.find(x => x.id === rankingId);
+  if (!r) return;
+
+  const tmpl     = getTemplates().invite;
+  const company  = currentUser.name || currentUser.email.split('@')[0];
+  const sender   = currentUser.name || company;
+  const body     = fillTemplate(tmpl, { name: r.name, jobTitle: r.jobTitle || 'the role', company, senderName: sender, email: r.email });
+
+  // Schedule 7 days from now 10:00–11:00
+  const start = new Date(); start.setDate(start.getDate() + 7); start.setHours(10, 0, 0, 0);
+  const end   = new Date(start); end.setHours(11, 0, 0, 0);
+  const fmt   = d => d.toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z';
+
+  const params = new URLSearchParams({
+    action:  'EDIT',
+    text:    `Interview: ${r.name} — ${r.jobTitle || 'Role'}`,
+    dates:   `${fmt(start)}/${fmt(end)}`,
+    details: body,
+    add:     r.email
+  });
+  window.open(`https://calendar.google.com/calendar/render?${params.toString()}`, '_blank');
+
+  // Update status
+  r.status = 'invited';
+  saveRankings(rankings);
+  renderMatrix();
+}
+
+// Rejection letter
+function openRejectModal(rankingId) {
+  const rankings = getRankings();
+  const r        = rankings.find(x => x.id === rankingId);
+  if (!r) return;
+  rejectTarget = r;
+
+  const company  = currentUser.name || currentUser.email.split('@')[0];
+  const sender   = currentUser.name || company;
+  const body     = fillTemplate(getTemplates().rejection, { name: r.name, jobTitle: r.jobTitle || 'the role', company, senderName: sender });
+
+  document.getElementById('reject-to-label').textContent = `To: ${r.name} <${r.email}>`;
+  document.getElementById('reject-preview').textContent  = body;
+  document.getElementById('reject-modal').style.display  = 'flex';
+}
+function closeRejectModal() {
+  document.getElementById('reject-modal').style.display = 'none';
+  rejectTarget = null;
+}
+function openMailtoReject() {
+  const company = currentUser.name || currentUser.email.split('@')[0];
+  const sender  = currentUser.name || company;
+  const body    = fillTemplate(getTemplates().rejection, { name: rejectTarget.name, jobTitle: rejectTarget.jobTitle || 'the role', company, senderName: sender });
+  const subject = `Your application for ${rejectTarget.jobTitle || 'the role'} at ${company}`;
+  window.location.href = `mailto:${rejectTarget.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+function copyRejectText() {
+  const text = document.getElementById('reject-preview').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn  = document.getElementById('copy-reject-btn');
+    const orig = btn.textContent;
+    btn.textContent = '✅ Copied!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+function confirmReject() {
+  if (!rejectTarget) return;
+  const rankings = getRankings();
+  const r = rankings.find(x => x.id === rejectTarget.id);
+  if (r) { r.status = 'rejected'; saveRankings(rankings); }
+  closeRejectModal();
+  renderMatrix();
+}
+
+// ─── EMAIL TEMPLATES ─────────────────────
+function renderTemplates() {
+  const t = getTemplates();
+  const rejTA  = document.getElementById('rejection-template');
+  const invTA  = document.getElementById('invite-template');
+  rejTA.value  = t.rejection;
+  invTA.value  = t.invite;
+  updatePreviews();
+  rejTA.addEventListener('input', updatePreviews);
+  invTA.addEventListener('input', updatePreviews);
+}
+function updatePreviews() {
+  const company = currentUser?.name || 'Your Company';
+  const sender  = currentUser?.name || company;
+  const vars    = { name: 'Alex Rivera', jobTitle: 'Frontend Engineer', company, senderName: sender, email: 'alex@example.com' };
+  document.getElementById('rejection-preview').textContent = fillTemplate(document.getElementById('rejection-template').value, vars);
+  document.getElementById('invite-preview').textContent    = fillTemplate(document.getElementById('invite-template').value, vars);
+}
+function saveRejectionTemplate() {
+  const t = getTemplates();
+  t.rejection = document.getElementById('rejection-template').value;
+  saveTemplates(t);
+  flashSaved('save-reject-btn');
+}
+function saveInviteTemplate() {
+  const t = getTemplates();
+  t.invite = document.getElementById('invite-template').value;
+  saveTemplates(t);
+  flashSaved('save-invite-btn');
+}
+function flashSaved(btnId) {
+  const btn = document.getElementById(btnId);
+  const orig = btn.textContent;
+  btn.textContent = '✅ Saved';
+  btn.classList.add('bg-emerald-600');
+  setTimeout(() => { btn.textContent = orig; btn.classList.remove('bg-emerald-600'); }, 1800);
+}
+
+// ─── UTILS ───────────────────────────────
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fillTemplate(tmpl, vars) {
+  return tmpl.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] || `{{${k}}}`);
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+functions/node_modules/
+
+# Build output
+dist/
+
+# Environment & secrets
+.env
+.env.local
+*.env
+
+# Firebase
+.firebase/
+.firebaserc
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude / AI
+.claude/
+
+# Logs
+*.log
+npm-debug.log*
