@@ -1743,34 +1743,30 @@ async function runScreening() {
 
 // ─── GEMINI API ───────────────────────────
 async function callGemini(apiKey, jd, candidates) {
-  const prompt = `You are an expert technical recruiter. Score each candidate's resume against the job description below.
-
-JOB DESCRIPTION:
-${jd}
-
+  // Keep inputs tight — shorter tokens = faster response
+  const jdSnippet = jd.substring(0, 800);
+  const prompt =
+`Score each candidate 0-100 for fit with this job. Differentiate clearly.
+JOB: ${jdSnippet}
 CANDIDATES:
 ${candidates.map((c, i) =>
-  `${i + 1}. Name: ${c.name}
-${c.cvText ? `Resume:\n${c.cvText.substring(0, 2000)}` : `Resume file: ${c.resume || 'not provided'}`}`
-).join('\n---\n')}
-
-Return a JSON array with exactly ${candidates.length} objects. One per candidate, in the same order:
-[{"score": 85, "reasoning": "one concise sentence specific to this candidate"}]
-
-Rules:
-- score is 0-100 based on fit with the job description
-- Be realistic and differentiate clearly between candidates
-- reasoning must mention something specific about the candidate
-- Return ONLY the JSON array, no markdown, no extra text`;
+  `${i + 1}. ${c.name}: ${(c.cvText || c.resume || 'no resume provided').substring(0, 600)}`
+).join('\n')}
+Return ONLY a JSON array of exactly ${candidates.length} objects, same order:
+[{"score":85,"reasoning":"one specific sentence about this candidate"}]`;
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
     {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 1024 }
+        generationConfig: {
+          temperature:      0.1,
+          maxOutputTokens:  300,
+          responseMimeType: 'application/json'
+        }
       })
     }
   );
