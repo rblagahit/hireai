@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HireAI — Hire Smarter with AI</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <style>
     * { -webkit-font-smoothing: antialiased; }
     .hidden-el { display: none !important; }
@@ -974,6 +978,21 @@
 ════════════════════════════════════════ -->
 <script>
 
+// ─── FIREBASE CONFIG ──────────────────────
+// ⬇ Paste YOUR config from Firebase Console → Project Settings → Your apps
+const firebaseConfig = {
+  apiKey:            "PASTE_YOUR_API_KEY",
+  authDomain:        "PASTE_YOUR_PROJECT_ID.firebaseapp.com",
+  projectId:         "PASTE_YOUR_PROJECT_ID",
+  storageBucket:     "PASTE_YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "PASTE_YOUR_MESSAGING_SENDER_ID",
+  appId:             "PASTE_YOUR_APP_ID"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
 // ─── DEFAULT TEMPLATES ───────────────────
 const DEFAULT_REJECTION = `Dear {{name}},
 
@@ -1004,40 +1023,73 @@ Best regards,
 {{company}}`;
 
 // ─── STATE ───────────────────────────────
-let authMode       = 'login';
-let currentUser    = null;
-let selectedFiles  = [];
+let authMode          = 'login';
+let currentUser       = null;
+let selectedFiles     = [];
 let currentApplyJobId = null;
-let resumeFile     = null;
-let rejectTarget   = null; // { ranking, jobTitle }
+let resumeFile        = null;
+let rejectTarget      = null;
+let screeningJobId    = null;
 
-// ─── PERSISTENCE ─────────────────────────
-const load  = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch { return d; } };
-const save  = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+// ─── FIRESTORE REFS ───────────────────────
+const jobsCol    = () => db.collection(`users/${auth.currentUser.uid}/jobs`);
+const appsCol    = () => db.collection(`users/${auth.currentUser.uid}/applications`);
+const settingDoc = (name) => db.doc(`users/${auth.currentUser.uid}/settings/${name}`);
 
-const getJobs        = () => load('hireai_jobs',        []);
-const saveJobs       = v  => save('hireai_jobs',        v);
-const getApplications= () => load('hireai_applications',[]);
-const saveApplications=v  => save('hireai_applications',v);
-const getRankings    = () => load('hireai_rankings',    []);
-const saveRankings   = v  => save('hireai_rankings',    v);
-const getUsers       = () => load('hireai_users',       {});
-const saveUsers      = v  => save('hireai_users',       v);
-const getSavedUser   = () => load('hireai_user',        null);
-const saveSavedUser  = v  => save('hireai_user',        v);
-const getTemplates   = () => load('hireai_templates',   { rejection: DEFAULT_REJECTION, invite: DEFAULT_INVITE });
-const saveTemplates  = v  => save('hireai_templates',   v);
+// ─── DATA HELPERS ─────────────────────────
+async function getJobs() {
+  try {
+    const snap = await jobsCol().orderBy('createdAt', 'desc').get();
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch { return []; }
+}
+async function getApplications() {
+  try {
+    const snap = await appsCol().get();
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch { return []; }
+}
+async function getRankings() {
+  try {
+    const snap = await settingDoc('rankings').get();
+    return snap.exists ? (snap.data().candidates || []) : [];
+  } catch { return []; }
+}
+async function saveRankings(candidates) {
+  await settingDoc('rankings').set({
+    candidates,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+async function getTemplates() {
+  try {
+    const snap = await settingDoc('templates').get();
+    return snap.exists ? snap.data() : { rejection: DEFAULT_REJECTION, invite: DEFAULT_INVITE };
+  } catch { return { rejection: DEFAULT_REJECTION, invite: DEFAULT_INVITE }; }
+}
+async function saveTemplatesDB(data) {
+  await settingDoc('templates').set(data);
+}
 
 // ─── INIT ────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  currentUser = getSavedUser();
-  if (currentUser) showApp();
   window.addEventListener('scroll', () => {
     const nav = document.getElementById('landing-nav');
     if (!nav) return;
     nav.className = window.scrollY > 20
       ? 'fixed w-full z-50 transition-all py-4 bg-white/80 backdrop-blur-md shadow-sm'
       : 'fixed w-full z-50 transition-all py-6';
+  });
+
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      currentUser = { uid: user.uid, email: user.email, name: user.displayName || user.email.split('@')[0] };
+      showApp();
+    } else {
+      currentUser = null;
+      document.getElementById('page-app').style.display    = 'none';
+      document.getElementById('page-landing').style.display = 'block';
+    }
   });
 });
 
@@ -1067,31 +1119,37 @@ function updateAuthUI() {
   document.getElementById('auth-toggle-btn').textContent  = isLogin ? 'Sign up'                 : 'Sign in';
   document.getElementById('auth-error').style.display = 'none';
 }
-function handleAuth(e) {
+async function handleAuth(e) {
   e.preventDefault();
   const name     = document.getElementById('auth-name').value.trim();
   const email    = document.getElementById('auth-email').value.trim();
   const password = document.getElementById('auth-password').value;
   const errEl    = document.getElementById('auth-error');
-  if (password.length < 6) { showErr(errEl, 'Password must be at least 6 characters.'); return; }
-  const users = getUsers();
-  if (authMode === 'register') {
-    if (users[email]) { showErr(errEl, 'An account with this email already exists.'); return; }
-    users[email] = { email, password, name: name || email.split('@')[0] };
-    saveUsers(users);
-  } else {
-    if (!users[email] || users[email].password !== password) { showErr(errEl, 'Incorrect email or password.'); return; }
+  const btn      = e.target.querySelector('button[type="submit"]');
+  btn.disabled    = true;
+  btn.textContent = 'Please wait…';
+  try {
+    if (authMode === 'register') {
+      const cred = await auth.createUserWithEmailAndPassword(email, password);
+      await cred.user.updateProfile({ displayName: name || email.split('@')[0] });
+    } else {
+      await auth.signInWithEmailAndPassword(email, password);
+    }
+    closeAuth();
+  } catch (err) {
+    const msg = err.code === 'auth/email-already-in-use' ? 'An account with this email already exists.'
+              : err.code === 'auth/wrong-password'        ? 'Incorrect password.'
+              : err.code === 'auth/user-not-found'        ? 'No account found with this email.'
+              : err.code === 'auth/weak-password'         ? 'Password must be at least 6 characters.'
+              : err.message;
+    showErr(errEl, msg);
+    btn.disabled    = false;
+    btn.textContent = 'Continue';
   }
-  currentUser = users[email];
-  saveSavedUser(currentUser);
-  closeAuth();
-  showApp();
 }
 function showErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
-function logout() {
-  currentUser = null; saveSavedUser(null);
-  document.getElementById('page-app').style.display = 'none';
-  document.getElementById('page-landing').style.display = 'block';
+async function logout() {
+  await auth.signOut();
   window.scrollTo(0, 0);
 }
 
@@ -1123,27 +1181,29 @@ function toggleJobForm() {
   const el = document.getElementById('job-form-wrap');
   el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
-function createJob(e) {
+async function createJob(e) {
   e.preventDefault();
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled    = true;
+  btn.textContent = 'Saving…';
   const title    = document.getElementById('f-title').value.trim();
   const dept     = document.getElementById('f-dept').value.trim();
   const location = document.getElementById('f-location').value.trim();
   const type     = document.getElementById('f-type').value;
   const quota    = parseInt(document.getElementById('f-quota').value) || 200;
   const desc     = document.getElementById('f-desc').value.trim();
-  const slug     = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36);
-  const jobs = getJobs();
-  jobs.unshift({ id: slug, slug, title, dept, location, type, quota, desc, applications: 0, createdAt: Date.now(), status: 'active' });
-  saveJobs(jobs);
+  await jobsCol().add({ title, dept, location, type, quota, desc, applications: 0, status: 'active', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
   ['f-title','f-dept','f-location','f-desc'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-quota').value = '200';
   document.getElementById('job-form-wrap').style.display = 'none';
-  renderJobs();
+  btn.disabled    = false;
+  btn.textContent = 'Publish Job';
+  await renderJobs();
 }
-function renderJobs() {
-  const jobs = getJobs();
-  const apps = getApplications();
-  const el   = document.getElementById('jobs-list');
+async function renderJobs() {
+  const el = document.getElementById('jobs-list');
+  el.innerHTML = '<p class="text-slate-400 text-sm font-bold px-2 py-4">Loading…</p>';
+  const [jobs, apps] = await Promise.all([getJobs(), getApplications()]);
   if (!jobs.length) {
     el.innerHTML = `<div class="bg-white border-2 border-dashed border-slate-200 rounded-[2rem] p-20 text-center">
       <p class="text-5xl mb-4">💼</p>
@@ -1152,13 +1212,13 @@ function renderJobs() {
     return;
   }
   el.innerHTML = jobs.map(job => {
-    const jobApps   = apps.filter(a => a.jobId === job.id);
-    const total     = jobApps.length;
-    const pending   = jobApps.filter(a => a.status === 'pending').length;
-    const pct       = Math.min(100, Math.round((total / job.quota) * 100));
-    const bar       = pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-400' : 'bg-emerald-500';
-    const txt       = pct >= 80 ? 'text-amber-600' : 'text-slate-400';
-    const meta      = [job.dept, job.location, job.type].filter(Boolean).join(' · ');
+    const jobApps = apps.filter(a => a.jobId === job.id);
+    const total   = jobApps.length;
+    const pending = jobApps.filter(a => a.status === 'pending').length;
+    const pct     = Math.min(100, Math.round((total / job.quota) * 100));
+    const bar     = pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-400' : 'bg-emerald-500';
+    const txt     = pct >= 80 ? 'text-amber-600' : 'text-slate-400';
+    const meta    = [job.dept, job.location, job.type].filter(Boolean).join(' · ');
     return `<div class="bg-white border border-slate-200 rounded-[1.5rem] p-6 shadow-sm mb-4">
       <div class="flex items-start justify-between mb-4">
         <div>
@@ -1171,7 +1231,7 @@ function renderJobs() {
             class="flex items-center space-x-1.5 text-xs font-bold border border-emerald-200 text-emerald-700 bg-emerald-50 px-3 py-2 rounded-xl hover:bg-emerald-100 transition-colors">
             👁️ Apply Page
           </button>
-          <button onclick="copyLink('${job.slug}')" id="copy-${job.slug}"
+          <button onclick="copyLink('${job.id}')" id="copy-${job.id}"
             class="flex items-center space-x-1.5 text-xs font-bold border border-slate-200 text-slate-500 px-3 py-2 rounded-xl hover:bg-slate-50 transition-colors">
             🔗 Copy Link
           </button>
@@ -1193,9 +1253,10 @@ function renderJobs() {
     </div>`;
   }).join('');
 }
-function copyLink(slug) {
-  navigator.clipboard.writeText(`https://hireai.app/jobs/${slug}`).then(() => {
-    const btn = document.getElementById('copy-' + slug);
+function copyLink(jobId) {
+  const url = `${location.origin}${location.pathname}?apply=${jobId}`;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('copy-' + jobId);
     if (!btn) return;
     const orig = btn.innerHTML;
     btn.innerHTML = '✅ Copied!';
@@ -1204,16 +1265,24 @@ function copyLink(slug) {
   });
 }
 function screenJob(jobId) {
-  const job = getJobs().find(j => j.id === jobId);
   showTab('screening');
-  if (job) setTimeout(() => { document.getElementById('screening-jd').value = job.desc; updatePendingBadge(jobId); }, 80);
+  setTimeout(async () => {
+    screeningJobId = jobId;
+    const jobs = await getJobs();
+    const job  = jobs.find(j => j.id === jobId);
+    if (job) document.getElementById('screening-jd').value = job.desc;
+    const sel = document.getElementById('screening-job-sel');
+    if (sel) sel.value = jobId;
+    await updatePendingBadge(jobId);
+  }, 100);
 }
 
 // ─── APPLY MODAL ─────────────────────────
-function openApply(jobId) {
+async function openApply(jobId) {
   currentApplyJobId = jobId;
   resumeFile = null;
-  const job = getJobs().find(j => j.id === jobId);
+  const jobs = await getJobs();
+  const job  = jobs.find(j => j.id === jobId);
   document.getElementById('apply-job-label').textContent = job ? job.title : '';
   document.getElementById('apply-form-wrap').style.display = 'block';
   document.getElementById('apply-success').style.display = 'none';
@@ -1241,45 +1310,33 @@ function onResumeSelected(e) {
   resumeFile = file;
   document.getElementById('resume-label').textContent = `✅ ${file.name}`;
 }
-function submitApplication(e) {
+async function submitApplication(e) {
   e.preventDefault();
   const name  = document.getElementById('apply-name').value.trim();
   const email = document.getElementById('apply-email').value.trim();
   const errEl = document.getElementById('apply-error');
   if (!resumeFile) { showErr(errEl, 'Please upload your resume (PDF or DOC).'); return; }
   if (!name || !email) { showErr(errEl, 'Please fill in all required fields.'); return; }
-
-  const apps = getApplications();
-  // Check for duplicate email on same job
-  if (apps.find(a => a.jobId === currentApplyJobId && a.email.toLowerCase() === email.toLowerCase())) {
-    showErr(errEl, 'You have already applied for this position.'); return;
-  }
-
-  const newApp = {
-    id:         'app-' + Date.now().toString(36),
-    jobId:      currentApplyJobId,
-    jobTitle:   getJobs().find(j => j.id === currentApplyJobId)?.title || '',
-    name, email,
-    resumeName: resumeFile.name,
-    status:     'pending',
-    appliedAt:  Date.now()
-  };
-  apps.push(newApp);
-  saveApplications(apps);
-
-  // Increment job's application count
-  const jobs = getJobs();
-  const job  = jobs.find(j => j.id === currentApplyJobId);
-  if (job) { job.applications = (job.applications || 0) + 1; saveJobs(jobs); }
-
-  document.getElementById('apply-form-wrap').style.display = 'none';
-  document.getElementById('apply-success').style.display  = 'block';
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled    = true;
+  btn.textContent = 'Submitting…';
+  try {
+    const dup = await appsCol().where('jobId','==',currentApplyJobId).where('email','==',email.toLowerCase()).get();
+    if (!dup.empty) { showErr(errEl, 'You have already applied for this position.'); btn.disabled = false; btn.textContent = 'Submit Application'; return; }
+    const jobs = await getJobs();
+    const job  = jobs.find(j => j.id === currentApplyJobId);
+    await appsCol().add({ jobId: currentApplyJobId, jobTitle: job?.title || '', name, email: email.toLowerCase(), resumeName: resumeFile.name, status: 'pending', appliedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    if (job) await jobsCol().doc(currentApplyJobId).update({ applications: firebase.firestore.FieldValue.increment(1) });
+    document.getElementById('apply-form-wrap').style.display = 'none';
+    document.getElementById('apply-success').style.display   = 'block';
+  } catch (err) { showErr(errEl, 'Something went wrong. Please try again.'); }
+  btn.disabled    = false;
+  btn.textContent = 'Submit Application';
 }
 
 // ─── AI SCREENING ────────────────────────
-let screeningJobId = null;
-function renderScreeningSelector() {
-  const jobs = getJobs();
+async function renderScreeningSelector() {
+  const jobs = await getJobs();
   const el   = document.getElementById('screening-job-selector');
   if (!jobs.length) { el.innerHTML = ''; return; }
   el.innerHTML = `<div>
@@ -1288,19 +1345,26 @@ function renderScreeningSelector() {
       <option value="">— choose a job post —</option>
       ${jobs.map(j => `<option value="${j.id}">${esc(j.title)}${j.location ? ' · ' + esc(j.location) : ''}</option>`).join('')}
     </select></div>`;
+  if (screeningJobId) {
+    const sel = document.getElementById('screening-job-sel');
+    if (sel) { sel.value = screeningJobId; await updatePendingBadge(screeningJobId); }
+  }
 }
-function onScreeningJobChange(jobId) {
+async function onScreeningJobChange(jobId) {
   screeningJobId = jobId || null;
-  const job = getJobs().find(j => j.id === jobId);
+  const jobs = await getJobs();
+  const job  = jobs.find(j => j.id === jobId);
   if (job) document.getElementById('screening-jd').value = job.desc;
-  updatePendingBadge(jobId);
+  await updatePendingBadge(jobId);
 }
-function updatePendingBadge(jobId) {
-  const badge   = document.getElementById('pending-badge');
-  const pending = getApplications().filter(a => a.jobId === jobId && a.status === 'pending').length;
-  if (pending > 0) {
+async function updatePendingBadge(jobId) {
+  const badge = document.getElementById('pending-badge');
+  if (!jobId) { badge.style.display = 'none'; return; }
+  const snap  = await appsCol().where('jobId','==',jobId).where('status','==','pending').get();
+  const count = snap.size;
+  if (count > 0) {
     badge.style.display = 'block';
-    badge.textContent   = `📥 ${pending} pending application${pending > 1 ? 's' : ''} ready to screen for this job`;
+    badge.textContent   = `📥 ${count} pending application${count > 1 ? 's' : ''} ready to screen for this job`;
   } else {
     badge.style.display = 'none';
   }
@@ -1311,65 +1375,49 @@ function onFilesSelected(e) {
     ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected`
     : 'PDF, DOCX · max 200 CVs per batch';
 }
-function runScreening() {
+async function runScreening() {
   const jd = document.getElementById('screening-jd').value.trim();
   if (!jd) { alert('Please add a job description first.'); return; }
-
   const btn   = document.getElementById('screen-btn');
   const label = document.getElementById('screen-btn-label');
-  btn.disabled = true;
+  btn.disabled    = true;
   label.innerHTML = '<span class="spin">⚡</span>&nbsp; Processing...';
-
-  setTimeout(() => {
-    const apps = getApplications().filter(a => a.jobId === screeningJobId && a.status === 'pending');
-
-    let candidates;
-    if (apps.length > 0) {
-      // Score real applicants
-      candidates = apps.map((a, i) => ({
-        id:        a.id,
-        name:      a.name,
-        email:     a.email,
-        resume:    a.resumeName,
-        score:     Math.floor(Math.random() * 45) + 50, // 50–94
-        reasoning: pickReasoning(i),
-        jobId:     screeningJobId,
-        jobTitle:  a.jobTitle,
-        status:    'pending'
-      })).sort((a, b) => b.score - a.score);
-
-      // Mark those applications as "screened"
-      const allApps = getApplications();
-      apps.forEach(a => { const found = allApps.find(x => x.id === a.id); if (found) found.status = 'screened'; });
-      saveApplications(allApps);
-    } else {
-      // No real applicants — use mock data
-      candidates = [
-        { name:'Alex Rivera',   email:'alex@example.com',   score:92, reasoning:'Strong match — 7 yrs exp, exact stack, led similar-scale team' },
-        { name:'Jordan Chen',   email:'jordan@example.com', score:87, reasoning:'Excellent technical fit, minor gap in leadership experience' },
-        { name:'Sam Patel',     email:'sam@example.com',    score:79, reasoning:'Good skills overlap, resume shows strong growth trajectory' },
-        { name:'Taylor Brooks', email:'taylor@example.com', score:71, reasoning:'Relevant background, 2 of 5 must-haves present' },
-        { name:'Morgan Davis',  email:'morgan@example.com', score:58, reasoning:'Partial fit — junior level, missing key requirements' },
-        { name:'Casey Lee',     email:'casey@example.com',  score:44, reasoning:'Limited relevant experience for the role requirements' },
-      ].map((c, i) => ({
-        ...c,
-        id: 'r-' + i + '-' + Date.now().toString(36),
-        score: Math.max(10, Math.min(99, c.score + Math.floor(Math.random() * 8) - 4)),
-        jobId: screeningJobId,
-        jobTitle: getJobs().find(j => j.id === screeningJobId)?.title || 'Role',
-        status: 'pending'
-      })).sort((a, b) => b.score - a.score);
-    }
-
-    saveRankings(candidates);
-    btn.disabled = false;
-    label.textContent = 'Run AI Screening ($5.00 / batch)';
-    selectedFiles = [];
-    document.getElementById('file-count-label').textContent = 'PDF, DOCX · max 200 CVs per batch';
-    document.getElementById('cv-input').value = '';
-    document.getElementById('pending-badge').style.display = 'none';
-    showTab('matrix');
-  }, 2400);
+  const pendingSnap = screeningJobId
+    ? await appsCol().where('jobId','==',screeningJobId).where('status','==','pending').get()
+    : { docs: [] };
+  const pendingApps = pendingSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  await new Promise(r => setTimeout(r, 2400));
+  let candidates;
+  if (pendingApps.length > 0) {
+    candidates = pendingApps.map((a, i) => ({
+      id: 'r-' + Date.now().toString(36) + i, name: a.name, email: a.email,
+      resume: a.resumeName, score: Math.floor(Math.random() * 45) + 50,
+      reasoning: pickReasoning(i), jobId: screeningJobId, jobTitle: a.jobTitle, status: 'pending'
+    })).sort((a, b) => b.score - a.score);
+    const batch = db.batch();
+    pendingApps.forEach(a => batch.update(appsCol().doc(a.id), { status: 'screened' }));
+    await batch.commit();
+  } else {
+    const jobs = await getJobs();
+    const jobTitle = jobs.find(j => j.id === screeningJobId)?.title || 'Role';
+    candidates = [
+      { name:'Alex Rivera',   email:'alex@example.com',   score:92, reasoning:'Strong match — 7 yrs exp, exact stack, led similar-scale team' },
+      { name:'Jordan Chen',   email:'jordan@example.com', score:87, reasoning:'Excellent technical fit, minor gap in leadership experience' },
+      { name:'Sam Patel',     email:'sam@example.com',    score:79, reasoning:'Good skills overlap, resume shows strong growth trajectory' },
+      { name:'Taylor Brooks', email:'taylor@example.com', score:71, reasoning:'Relevant background, 2 of 5 must-haves present' },
+      { name:'Morgan Davis',  email:'morgan@example.com', score:58, reasoning:'Partial fit — junior level, missing key requirements' },
+      { name:'Casey Lee',     email:'casey@example.com',  score:44, reasoning:'Limited relevant experience for the role requirements' },
+    ].map((c, i) => ({ ...c, id: 'r-' + i + '-' + Date.now().toString(36), score: Math.max(10, Math.min(99, c.score + Math.floor(Math.random() * 8) - 4)), jobId: screeningJobId, jobTitle, status: 'pending' }))
+     .sort((a, b) => b.score - a.score);
+  }
+  await saveRankings(candidates);
+  btn.disabled = false;
+  label.textContent = 'Run AI Screening ($5.00 / batch)';
+  selectedFiles = [];
+  document.getElementById('file-count-label').textContent = 'PDF, DOCX · max 200 CVs per batch';
+  document.getElementById('cv-input').value = '';
+  document.getElementById('pending-badge').style.display = 'none';
+  showTab('matrix');
 }
 function pickReasoning(i) {
   const pool = [
@@ -1385,11 +1433,10 @@ function pickReasoning(i) {
 }
 
 // ─── TALENT MATRIX ───────────────────────
-function renderMatrix() {
-  const rankings = getRankings();
+async function renderMatrix() {
+  const rankings = await getRankings();
   const el       = document.getElementById('matrix-list');
   const legend   = document.getElementById('matrix-legend');
-
   if (!rankings.length) {
     legend.style.display = 'none';
     el.innerHTML = `<div class="bg-white border-2 border-dashed border-slate-200 rounded-[2rem] p-20 text-center">
@@ -1399,7 +1446,6 @@ function renderMatrix() {
     return;
   }
   legend.style.display = 'flex';
-
   el.innerHTML = rankings.map((r, i) => {
     const isTop5      = i < 5;
     const medal       = i === 0 ? 'bg-amber-400 text-white' : i === 1 ? 'bg-slate-400 text-white' : i === 2 ? 'bg-amber-700 text-white' : 'bg-slate-100 text-slate-500';
@@ -1408,14 +1454,8 @@ function renderMatrix() {
                       : r.status === 'rejected' ? '<span class="text-xs font-bold bg-red-50 text-red-500 px-2.5 py-1 rounded-lg ml-2">✉️ Rejection Sent</span>'
                       : '';
     const actions = isTop5
-      ? `<button onclick="scheduleInterview('${r.id}')"
-           class="text-xs font-bold border border-indigo-200 text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl hover:bg-indigo-100 transition-colors flex items-center space-x-1 ${r.status === 'invited' ? 'opacity-50' : ''}">
-           📅 <span>Schedule Interview</span>
-         </button>`
-      : `<button onclick="openRejectModal('${r.id}')"
-           class="text-xs font-bold border border-red-100 text-red-500 bg-red-50 px-3 py-2 rounded-xl hover:bg-red-100 transition-colors flex items-center space-x-1 ${r.status === 'rejected' ? 'opacity-50' : ''}">
-           ✉️ <span>Send Rejection</span>
-         </button>`;
+      ? `<button onclick="scheduleInterview('${r.id}')" class="text-xs font-bold border border-indigo-200 text-indigo-600 bg-indigo-50 px-3 py-2 rounded-xl hover:bg-indigo-100 transition-colors flex items-center space-x-1 ${r.status === 'invited' ? 'opacity-50' : ''}">📅 <span>Schedule Interview</span></button>`
+      : `<button onclick="openRejectModal('${r.id}')" class="text-xs font-bold border border-red-100 text-red-500 bg-red-50 px-3 py-2 rounded-xl hover:bg-red-100 transition-colors flex items-center space-x-1 ${r.status === 'rejected' ? 'opacity-50' : ''}">✉️ <span>Send Rejection</span></button>`;
     return `<div class="bg-white border ${isTop5 ? 'border-indigo-100' : 'border-slate-200'} rounded-[1.5rem] p-6 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow mb-3">
       <div class="flex items-center space-x-4 flex-1 min-w-0">
         <div class="w-9 h-9 rounded-full flex items-center justify-center font-black text-sm flex-shrink-0 ${medal}">${i + 1}</div>
@@ -1430,10 +1470,7 @@ function renderMatrix() {
         </div>
       </div>
       <div class="flex items-center space-x-4 flex-shrink-0 ml-6">
-        <div class="text-right">
-          <p class="text-4xl font-black ${scoreColor}">${r.score}</p>
-          <p class="text-xs text-slate-400 font-bold">/ 100</p>
-        </div>
+        <div class="text-right"><p class="text-4xl font-black ${scoreColor}">${r.score}</p><p class="text-xs text-slate-400 font-bold">/ 100</p></div>
         <div>${actions}</div>
       </div>
     </div>`;
@@ -1441,47 +1478,32 @@ function renderMatrix() {
 }
 
 // Google Calendar scheduling
-function scheduleInterview(rankingId) {
-  const rankings = getRankings();
-  const r        = rankings.find(x => x.id === rankingId);
+async function scheduleInterview(rankingId) {
+  const rankings  = await getRankings();
+  const r         = rankings.find(x => x.id === rankingId);
   if (!r) return;
-
-  const tmpl     = getTemplates().invite;
-  const company  = currentUser.name || currentUser.email.split('@')[0];
-  const sender   = currentUser.name || company;
-  const body     = fillTemplate(tmpl, { name: r.name, jobTitle: r.jobTitle || 'the role', company, senderName: sender, email: r.email });
-
-  // Schedule 7 days from now 10:00–11:00
+  const templates = await getTemplates();
+  const company   = currentUser.name || currentUser.email.split('@')[0];
+  const body      = fillTemplate(templates.invite, { name: r.name, jobTitle: r.jobTitle || 'the role', company, senderName: company, email: r.email });
   const start = new Date(); start.setDate(start.getDate() + 7); start.setHours(10, 0, 0, 0);
   const end   = new Date(start); end.setHours(11, 0, 0, 0);
   const fmt   = d => d.toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z';
-
-  const params = new URLSearchParams({
-    action:  'EDIT',
-    text:    `Interview: ${r.name} — ${r.jobTitle || 'Role'}`,
-    dates:   `${fmt(start)}/${fmt(end)}`,
-    details: body,
-    add:     r.email
-  });
+  const params = new URLSearchParams({ action: 'EDIT', text: `Interview: ${r.name} — ${r.jobTitle || 'Role'}`, dates: `${fmt(start)}/${fmt(end)}`, details: body, add: r.email });
   window.open(`https://calendar.google.com/calendar/render?${params.toString()}`, '_blank');
-
-  // Update status
-  r.status = 'invited';
-  saveRankings(rankings);
-  renderMatrix();
+  const updated = rankings.map(x => x.id === rankingId ? { ...x, status: 'invited' } : x);
+  await saveRankings(updated);
+  await renderMatrix();
 }
 
 // Rejection letter
-function openRejectModal(rankingId) {
-  const rankings = getRankings();
-  const r        = rankings.find(x => x.id === rankingId);
+async function openRejectModal(rankingId) {
+  const rankings  = await getRankings();
+  const r         = rankings.find(x => x.id === rankingId);
   if (!r) return;
-  rejectTarget = r;
-
-  const company  = currentUser.name || currentUser.email.split('@')[0];
-  const sender   = currentUser.name || company;
-  const body     = fillTemplate(getTemplates().rejection, { name: r.name, jobTitle: r.jobTitle || 'the role', company, senderName: sender });
-
+  rejectTarget    = r;
+  const templates = await getTemplates();
+  const company   = currentUser.name || currentUser.email.split('@')[0];
+  const body      = fillTemplate(templates.rejection, { name: r.name, jobTitle: r.jobTitle || 'the role', company, senderName: company });
   document.getElementById('reject-to-label').textContent = `To: ${r.name} <${r.email}>`;
   document.getElementById('reject-preview').textContent  = body;
   document.getElementById('reject-modal').style.display  = 'flex';
@@ -1490,59 +1512,58 @@ function closeRejectModal() {
   document.getElementById('reject-modal').style.display = 'none';
   rejectTarget = null;
 }
-function openMailtoReject() {
-  const company = currentUser.name || currentUser.email.split('@')[0];
-  const sender  = currentUser.name || company;
-  const body    = fillTemplate(getTemplates().rejection, { name: rejectTarget.name, jobTitle: rejectTarget.jobTitle || 'the role', company, senderName: sender });
-  const subject = `Your application for ${rejectTarget.jobTitle || 'the role'} at ${company}`;
+async function openMailtoReject() {
+  const templates = await getTemplates();
+  const company   = currentUser.name || currentUser.email.split('@')[0];
+  const body      = fillTemplate(templates.rejection, { name: rejectTarget.name, jobTitle: rejectTarget.jobTitle || 'the role', company, senderName: company });
+  const subject   = `Your application for ${rejectTarget.jobTitle || 'the role'} at ${company}`;
   window.location.href = `mailto:${rejectTarget.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 function copyRejectText() {
   const text = document.getElementById('reject-preview').textContent;
   navigator.clipboard.writeText(text).then(() => {
-    const btn  = document.getElementById('copy-reject-btn');
+    const btn = document.getElementById('copy-reject-btn');
     const orig = btn.textContent;
     btn.textContent = '✅ Copied!';
     setTimeout(() => btn.textContent = orig, 2000);
   });
 }
-function confirmReject() {
+async function confirmReject() {
   if (!rejectTarget) return;
-  const rankings = getRankings();
-  const r = rankings.find(x => x.id === rejectTarget.id);
-  if (r) { r.status = 'rejected'; saveRankings(rankings); }
+  const rankings = await getRankings();
+  const updated  = rankings.map(x => x.id === rejectTarget.id ? { ...x, status: 'rejected' } : x);
+  await saveRankings(updated);
   closeRejectModal();
-  renderMatrix();
+  await renderMatrix();
 }
 
 // ─── EMAIL TEMPLATES ─────────────────────
-function renderTemplates() {
-  const t = getTemplates();
-  const rejTA  = document.getElementById('rejection-template');
-  const invTA  = document.getElementById('invite-template');
-  rejTA.value  = t.rejection;
-  invTA.value  = t.invite;
+async function renderTemplates() {
+  const t     = await getTemplates();
+  const rejTA = document.getElementById('rejection-template');
+  const invTA = document.getElementById('invite-template');
+  rejTA.value = t.rejection;
+  invTA.value = t.invite;
   updatePreviews();
-  rejTA.addEventListener('input', updatePreviews);
-  invTA.addEventListener('input', updatePreviews);
+  rejTA.oninput = updatePreviews;
+  invTA.oninput = updatePreviews;
 }
 function updatePreviews() {
   const company = currentUser?.name || 'Your Company';
-  const sender  = currentUser?.name || company;
-  const vars    = { name: 'Alex Rivera', jobTitle: 'Frontend Engineer', company, senderName: sender, email: 'alex@example.com' };
+  const vars    = { name: 'Alex Rivera', jobTitle: 'Frontend Engineer', company, senderName: company, email: 'alex@example.com' };
   document.getElementById('rejection-preview').textContent = fillTemplate(document.getElementById('rejection-template').value, vars);
   document.getElementById('invite-preview').textContent    = fillTemplate(document.getElementById('invite-template').value, vars);
 }
-function saveRejectionTemplate() {
-  const t = getTemplates();
+async function saveRejectionTemplate() {
+  const t = await getTemplates();
   t.rejection = document.getElementById('rejection-template').value;
-  saveTemplates(t);
+  await saveTemplatesDB(t);
   flashSaved('save-reject-btn');
 }
-function saveInviteTemplate() {
-  const t = getTemplates();
+async function saveInviteTemplate() {
+  const t = await getTemplates();
   t.invite = document.getElementById('invite-template').value;
-  saveTemplates(t);
+  await saveTemplatesDB(t);
   flashSaved('save-invite-btn');
 }
 function flashSaved(btnId) {
