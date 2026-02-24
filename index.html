@@ -86,6 +86,12 @@
           <p class="font-bold text-slate-600 text-sm">Upload Resume</p>
           <p id="resume-label" class="text-xs text-slate-400 mt-1">PDF or DOC / DOCX · max 10 MB</p>
         </div>
+        <div>
+          <label class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">
+            Paste CV / Resume Text <span class="text-slate-300 font-normal normal-case tracking-normal">(optional — improves AI match accuracy)</span>
+          </label>
+          <textarea id="apply-cv-text" rows="5" placeholder="Paste your resume text, key skills, or work experience here..." class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm resize-none"></textarea>
+        </div>
         <p id="apply-error" style="display:none" class="text-xs text-red-500 font-bold"></p>
         <button type="submit" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-indigo-500 transition-colors">
           Submit Application
@@ -905,6 +911,19 @@
           <p class="text-slate-500 text-sm mt-1">Claude API · ~$0.003 / CV · max 200 CVs per batch</p>
         </div>
         <div class="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+          <!-- Gemini API Key -->
+          <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-3">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-sm font-black text-amber-800">🔑 Gemini API Key</p>
+                <p class="text-xs text-amber-700 mt-0.5">Required for real AI scoring. Free at <a href="https://aistudio.google.com" target="_blank" class="underline font-bold">aistudio.google.com</a> → Get API key</p>
+              </div>
+              <button onclick="saveGeminiKey()" id="save-gemini-btn" class="flex-shrink-0 bg-amber-800 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-amber-700 transition-colors">Save</button>
+            </div>
+            <input id="gemini-key-input" type="password" placeholder="AIzaSy…" class="w-full px-4 py-3 bg-white border border-amber-200 rounded-2xl text-sm font-mono" />
+            <p id="gemini-key-status" class="text-xs text-amber-600 font-bold" style="display:none"></p>
+          </div>
+
           <div id="screening-job-selector"></div>
           <div id="pending-badge" style="display:none" class="bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-3 text-sm font-bold text-indigo-700"></div>
           <div>
@@ -918,10 +937,10 @@
             <p id="file-count-label" class="text-xs text-slate-400 mt-1">PDF, DOCX · max 200 CVs per batch</p>
           </div>
           <div class="flex items-center space-x-4 text-xs text-slate-400 font-bold border-t border-slate-100 pt-4 flex-wrap gap-y-1">
-            <span>Claude API</span><span class="text-slate-200">·</span><span>Google Drive</span><span class="text-slate-200">·</span><span>OneDrive</span><span class="text-slate-200">·</span><span>Firebase Functions</span>
+            <span>Gemini API</span><span class="text-slate-200">·</span><span>Google Drive</span><span class="text-slate-200">·</span><span>OneDrive</span><span class="text-slate-200">·</span><span>Firebase Functions</span>
           </div>
           <button onclick="runScreening()" id="screen-btn" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center space-x-2 shadow-lg shadow-indigo-200 hover:bg-indigo-500 transition-colors">
-            <span>⚡</span><span id="screen-btn-label">Run AI Screening ($5.00 / batch)</span>
+            <span>⚡</span><span id="screen-btn-label">Run AI Screening</span>
           </button>
         </div>
       </div>
@@ -1052,6 +1071,15 @@ const appsCol    = () => db.collection(`users/${auth.currentUser.uid}/applicatio
 const settingDoc = (name) => db.doc(`users/${auth.currentUser.uid}/settings/${name}`);
 
 // ─── DATA HELPERS ─────────────────────────
+async function getConfig() {
+  try {
+    const snap = await settingDoc('config').get();
+    return snap.exists ? snap.data() : {};
+  } catch { return {}; }
+}
+async function saveConfig(data) {
+  await settingDoc('config').set(data, { merge: true });
+}
 async function getJobs() {
   try {
     const snap = await jobsCol().orderBy('createdAt', 'desc').get();
@@ -1344,7 +1372,8 @@ async function submitApplication(e) {
     if (!dup.empty) { showErr(errEl, 'You have already applied for this position.'); btn.disabled = false; btn.textContent = 'Submit Application'; return; }
     const jobs = await getJobs();
     const job  = jobs.find(j => j.id === currentApplyJobId);
-    await appsCol().add({ jobId: currentApplyJobId, jobTitle: job?.title || '', name, email: email.toLowerCase(), resumeName: resumeFile.name, status: 'pending', appliedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    const cvText = (document.getElementById('apply-cv-text')?.value || '').trim();
+    await appsCol().add({ jobId: currentApplyJobId, jobTitle: job?.title || '', name, email: email.toLowerCase(), resumeName: resumeFile.name, cvText, status: 'pending', appliedAt: firebase.firestore.FieldValue.serverTimestamp() });
     if (job) await jobsCol().doc(currentApplyJobId).update({ applications: firebase.firestore.FieldValue.increment(1) });
     document.getElementById('apply-form-wrap').style.display = 'none';
     document.getElementById('apply-success').style.display   = 'block';
@@ -1355,6 +1384,16 @@ async function submitApplication(e) {
 
 // ─── AI SCREENING ────────────────────────
 async function renderScreeningSelector() {
+  // Load saved Gemini key
+  const config = await getConfig();
+  const keyInput = document.getElementById('gemini-key-input');
+  if (keyInput && config.geminiKey) {
+    keyInput.value = config.geminiKey;
+    const status = document.getElementById('gemini-key-status');
+    status.textContent = '✅ API key saved';
+    status.style.display = 'block';
+  }
+
   const jobs = await getJobs();
   const el   = document.getElementById('screening-job-selector');
   if (!jobs.length) { el.innerHTML = ''; return; }
@@ -1388,6 +1427,17 @@ async function updatePendingBadge(jobId) {
     badge.style.display = 'none';
   }
 }
+async function saveGeminiKey() {
+  const key    = document.getElementById('gemini-key-input').value.trim();
+  const status = document.getElementById('gemini-key-status');
+  const btn    = document.getElementById('save-gemini-btn');
+  if (!key) { status.textContent = '⚠️ Enter a key first.'; status.style.display = 'block'; return; }
+  btn.textContent = 'Saving…';
+  await saveConfig({ geminiKey: key });
+  status.textContent  = '✅ API key saved';
+  status.style.display = 'block';
+  btn.textContent = 'Save';
+}
 function onFilesSelected(e) {
   selectedFiles = Array.from(e.target.files);
   document.getElementById('file-count-label').textContent = selectedFiles.length
@@ -1397,58 +1447,156 @@ function onFilesSelected(e) {
 async function runScreening() {
   const jd = document.getElementById('screening-jd').value.trim();
   if (!jd) { alert('Please add a job description first.'); return; }
+
+  const config    = await getConfig();
+  const geminiKey = config.geminiKey || '';
+  const useAI     = !!geminiKey;
+
   const btn   = document.getElementById('screen-btn');
   const label = document.getElementById('screen-btn-label');
   btn.disabled    = true;
-  label.innerHTML = '<span class="spin">⚡</span>&nbsp; Processing...';
+  label.innerHTML = `<span class="spin">⚡</span>&nbsp; ${useAI ? 'Scoring with Gemini AI…' : 'Processing…'}`;
+
   const pendingSnap = screeningJobId
     ? await appsCol().where('jobId','==',screeningJobId).where('status','==','pending').get()
     : { docs: [] };
   const pendingApps = pendingSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-  await new Promise(r => setTimeout(r, 2400));
+
   let candidates;
+
   if (pendingApps.length > 0) {
-    candidates = pendingApps.map((a, i) => ({
-      id: 'r-' + Date.now().toString(36) + i, name: a.name, email: a.email,
-      resume: a.resumeName, score: Math.floor(Math.random() * 45) + 50,
-      reasoning: pickReasoning(i), jobId: screeningJobId, jobTitle: a.jobTitle, status: 'pending'
-    })).sort((a, b) => b.score - a.score);
+    // Build candidate list with whatever content we have
+    const rawCandidates = pendingApps.map((a, i) => ({
+      id:        'r-' + Date.now().toString(36) + i,
+      name:      a.name,
+      email:     a.email,
+      resume:    a.resumeName,
+      cvText:    a.cvText || '',
+      jobId:     screeningJobId,
+      jobTitle:  a.jobTitle,
+      status:    'pending'
+    }));
+
+    if (useAI) {
+      try {
+        label.innerHTML = '<span class="spin">⚡</span>&nbsp; Gemini is scoring candidates…';
+        const scores = await callGemini(geminiKey, jd, rawCandidates);
+        candidates = rawCandidates.map((c, i) => ({
+          ...c,
+          score:     scores[i]?.score     ?? Math.floor(Math.random() * 45) + 50,
+          reasoning: scores[i]?.reasoning ?? 'Scored by AI'
+        })).sort((a, b) => b.score - a.score);
+      } catch (err) {
+        console.error('Gemini error:', err);
+        label.innerHTML = '<span class="spin">⚡</span>&nbsp; AI failed — using estimate…';
+        await new Promise(r => setTimeout(r, 1000));
+        candidates = rawCandidates.map((c, i) => ({
+          ...c, score: Math.floor(Math.random() * 45) + 50, reasoning: 'AI unavailable — estimated score'
+        })).sort((a, b) => b.score - a.score);
+      }
+    } else {
+      await new Promise(r => setTimeout(r, 1800));
+      candidates = rawCandidates.map((c, i) => ({
+        ...c, score: Math.floor(Math.random() * 45) + 50, reasoning: 'Add Gemini API key for real AI scoring'
+      })).sort((a, b) => b.score - a.score);
+    }
+
+    // Mark apps as screened
     const batch = db.batch();
     pendingApps.forEach(a => batch.update(appsCol().doc(a.id), { status: 'screened' }));
     await batch.commit();
+
   } else {
-    const jobs = await getJobs();
+    // No real applicants — demo mode with mock data
+    const jobs     = await getJobs();
     const jobTitle = jobs.find(j => j.id === screeningJobId)?.title || 'Role';
-    candidates = [
-      { name:'Alex Rivera',   email:'alex@example.com',   score:92, reasoning:'Strong match — 7 yrs exp, exact stack, led similar-scale team' },
-      { name:'Jordan Chen',   email:'jordan@example.com', score:87, reasoning:'Excellent technical fit, minor gap in leadership experience' },
-      { name:'Sam Patel',     email:'sam@example.com',    score:79, reasoning:'Good skills overlap, resume shows strong growth trajectory' },
-      { name:'Taylor Brooks', email:'taylor@example.com', score:71, reasoning:'Relevant background, 2 of 5 must-haves present' },
-      { name:'Morgan Davis',  email:'morgan@example.com', score:58, reasoning:'Partial fit — junior level, missing key requirements' },
-      { name:'Casey Lee',     email:'casey@example.com',  score:44, reasoning:'Limited relevant experience for the role requirements' },
-    ].map((c, i) => ({ ...c, id: 'r-' + i + '-' + Date.now().toString(36), score: Math.max(10, Math.min(99, c.score + Math.floor(Math.random() * 8) - 4)), jobId: screeningJobId, jobTitle, status: 'pending' }))
-     .sort((a, b) => b.score - a.score);
+    const mockData = [
+      { name:'Alex Rivera',   email:'alex@example.com',   cvText:'Senior software engineer with 7 years experience in React, Node.js, and AWS. Led teams of 5-10 engineers. Strong background in scalable architecture.' },
+      { name:'Jordan Chen',   email:'jordan@example.com', cvText:'Full-stack developer with 5 years experience. Proficient in Vue, Python, and PostgreSQL. Contributed to open source projects.' },
+      { name:'Sam Patel',     email:'sam@example.com',    cvText:'Backend developer 4 years, specialising in microservices and Kubernetes. Some frontend experience with React.' },
+      { name:'Taylor Brooks', email:'taylor@example.com', cvText:'Mid-level developer 3 years experience. JavaScript and PHP. Has worked in agile teams at startups.' },
+      { name:'Morgan Davis',  email:'morgan@example.com', cvText:'Junior developer 1 year experience, bootcamp graduate. Learning React and Node. Enthusiastic and fast learner.' },
+      { name:'Casey Lee',     email:'casey@example.com',  cvText:'Recent graduate with internship experience in data entry and basic HTML/CSS. Eager to transition into software development.' },
+    ];
+
+    const rawCandidates = mockData.map((c, i) => ({
+      id: 'r-' + i + '-' + Date.now().toString(36), ...c, resume: 'resume.pdf', jobId: screeningJobId, jobTitle, status: 'pending'
+    }));
+
+    if (useAI) {
+      try {
+        label.innerHTML = '<span class="spin">⚡</span>&nbsp; Gemini is scoring demo candidates…';
+        const scores = await callGemini(geminiKey, jd, rawCandidates);
+        candidates = rawCandidates.map((c, i) => ({
+          ...c,
+          score:     scores[i]?.score     ?? 50,
+          reasoning: scores[i]?.reasoning ?? 'Scored by AI'
+        })).sort((a, b) => b.score - a.score);
+      } catch (err) {
+        console.error('Gemini error:', err);
+        candidates = rawCandidates.map((c, i) => ({
+          ...c, score: [92,87,79,71,58,44][i], reasoning: 'AI unavailable — using demo scores'
+        }));
+      }
+    } else {
+      await new Promise(r => setTimeout(r, 1800));
+      candidates = rawCandidates.map((c, i) => ({
+        ...c, score: Math.max(10, Math.min(99, [92,87,79,71,58,44][i] + Math.floor(Math.random()*8)-4)),
+        reasoning: 'Add Gemini API key above for real AI scoring'
+      }));
+    }
   }
+
   await saveRankings(candidates);
-  btn.disabled = false;
-  label.textContent = 'Run AI Screening ($5.00 / batch)';
-  selectedFiles = [];
+  btn.disabled    = false;
+  label.textContent = 'Run AI Screening';
+  selectedFiles   = [];
   document.getElementById('file-count-label').textContent = 'PDF, DOCX · max 200 CVs per batch';
   document.getElementById('cv-input').value = '';
   document.getElementById('pending-badge').style.display = 'none';
   showTab('matrix');
 }
-function pickReasoning(i) {
-  const pool = [
-    'Strong match — relevant experience and skills align well with requirements',
-    'Excellent technical fit, with demonstrated impact in similar roles',
-    'Good skills overlap, resume shows consistent growth trajectory',
-    'Solid background, meets most core requirements for this position',
-    'Relevant experience, some gaps in required technical areas',
-    'Partial fit — shows potential but lacks key experience',
-    'Limited directly relevant experience for this specific role',
-  ];
-  return pool[Math.min(i, pool.length - 1)];
+
+// ─── GEMINI API ───────────────────────────
+async function callGemini(apiKey, jd, candidates) {
+  const prompt = `You are an expert technical recruiter. Score each candidate's resume against the job description below.
+
+JOB DESCRIPTION:
+${jd}
+
+CANDIDATES:
+${candidates.map((c, i) =>
+  `${i + 1}. Name: ${c.name}
+${c.cvText ? `Resume:\n${c.cvText.substring(0, 2000)}` : `Resume file: ${c.resume || 'not provided'}`}`
+).join('\n---\n')}
+
+Return a JSON array with exactly ${candidates.length} objects. One per candidate, in the same order:
+[{"score": 85, "reasoning": "one concise sentence specific to this candidate"}]
+
+Rules:
+- score is 0-100 based on fit with the job description
+- Be realistic and differentiate clearly between candidates
+- reasoning must mention something specific about the candidate
+- Return ONLY the JSON array, no markdown, no extra text`;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 1024 }
+      })
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+  return JSON.parse(text.replace(/```json|```/g, '').trim());
 }
 
 // ─── TALENT MATRIX ───────────────────────
